@@ -18,8 +18,9 @@ import { Button } from '@/components/ui/button';
 import {
   LayoutDashboard, Users, DoorOpen, CalendarDays,
   BookOpen, Star, FileText, Calendar, AlertTriangle,
-  LogOut, Music, Bell
+  LogOut, Bell
 } from 'lucide-react';
+import logoGrt from '@/assets/logo-grt.jpg';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface NavItem {
@@ -74,10 +75,10 @@ export function AppSidebar() {
       <SidebarContent>
         <SidebarGroup>
           <div className="flex items-center gap-2 px-3 py-4">
-            <div className="w-8 h-8 bg-sidebar-primary rounded-lg flex items-center justify-center shrink-0">
-              <Music className="w-4 h-4 text-sidebar-primary-foreground" />
+            <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0">
+              <img src={logoGrt} alt="Logo GRT" className="w-full h-full object-cover" />
             </div>
-            {!collapsed && <span className="font-display font-bold text-sidebar-accent-foreground text-sm">Escola de Música</span>}
+            {!collapsed && <span className="font-display font-bold text-sidebar-accent-foreground text-sm">Escola de Música GRT</span>}
           </div>
         </SidebarGroup>
 

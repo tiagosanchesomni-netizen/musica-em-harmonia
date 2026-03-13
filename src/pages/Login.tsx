@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Music, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
+import logoGrt from '@/assets/logo-grt.jpg';
 
 export default function Login() {
   const { login } = useAuth();
@@ -26,10 +27,10 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-primary p-4">
       <Card className="w-full max-w-md shadow-2xl border-0">
         <CardHeader className="text-center pb-2 pt-8">
-          <div className="mx-auto w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mb-4">
-            <Music className="w-8 h-8 text-primary-foreground" />
+          <div className="mx-auto w-20 h-20 rounded-2xl overflow-hidden mb-4">
+            <img src={logoGrt} alt="Logo GRT" className="w-full h-full object-cover" />
           </div>
-          <h1 className="text-2xl font-display font-bold text-foreground">Escola de Música</h1>
+          <h1 className="text-2xl font-display font-bold text-foreground">Escola de Música GRT</h1>
           <p className="text-muted-foreground text-sm mt-1">Sistema de Gestão Interno</p>
         </CardHeader>
         <CardContent className="pt-4 pb-8">
