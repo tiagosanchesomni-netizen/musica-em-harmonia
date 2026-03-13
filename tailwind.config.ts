@@ -13,6 +13,10 @@ export default {
       },
     },
     extend: {
+      fontFamily: {
+        display: ['Space Grotesk', 'sans-serif'],
+        body: ['Inter', 'sans-serif'],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -56,6 +60,17 @@ export default {
           "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
+        },
+        status: {
+          taught: "hsl(var(--status-taught))",
+          "taught-foreground": "hsl(var(--status-taught-foreground))",
+          canceled: "hsl(var(--status-canceled))",
+          "canceled-foreground": "hsl(var(--status-canceled-foreground))",
+          scheduled: "hsl(var(--status-scheduled))",
+          "scheduled-foreground": "hsl(var(--status-scheduled-foreground))",
+          absent: "hsl(var(--status-absent))",
+          "absent-foreground": "hsl(var(--status-absent-foreground))",
+          present: "hsl(var(--status-present))",
         },
       },
       borderRadius: {
