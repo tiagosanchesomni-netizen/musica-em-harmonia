@@ -18,8 +18,9 @@ import { Button } from '@/components/ui/button';
 import {
   LayoutDashboard, Users, DoorOpen, CalendarDays,
   BookOpen, Star, FileText, Calendar, AlertTriangle,
-  LogOut, Music, Bell
+  LogOut, Bell
 } from 'lucide-react';
+import logoGrt from '@/assets/logo-grt.jpg';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface NavItem {
