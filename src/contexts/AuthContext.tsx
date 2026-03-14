@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import type { User as SupaUser, Session } from '@supabase/supabase-js';
 
 export type UserRole = 'admin' | 'teacher' | 'student';
 
@@ -12,47 +14,82 @@ export interface User {
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => boolean;
-  logout: () => void;
+  login: (email: string, password: string) => Promise<boolean>;
+  logout: () => Promise<void>;
   isAuthenticated: boolean;
+  loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-// Mock users database
-const MOCK_USERS: (User & { password: string })[] = [
-  { id: '1', email: '1999tiagosanches@gmail.com', password: 'grt', name: 'Tiago Sanches', role: 'admin', status: 'active' },
-  { id: '2', email: 'professor@escola.pt', password: '123', name: 'Maria Silva', role: 'teacher', status: 'active' },
-  { id: '3', email: 'aluno@escola.pt', password: '123', name: 'João Costa', role: 'student', status: 'active' },
-  { id: '4', email: 'prof.carlos@escola.pt', password: '123', name: 'Carlos Mendes', role: 'teacher', status: 'active' },
-  { id: '5', email: 'ana@escola.pt', password: '123', name: 'Ana Rodrigues', role: 'student', status: 'active' },
-  { id: '6', email: 'pedro@escola.pt', password: '123', name: 'Pedro Ferreira', role: 'student', status: 'active' },
-];
+async function fetchProfile(userId: string): Promise<User | null> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .single();
+  if (error || !data) return null;
+  return {
+    id: data.id,
+    email: data.email,
+    name: data.name,
+    role: data.role as UserRole,
+    status: data.status as 'active' | 'archived',
+  };
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('music-school-user');
-    return saved ? JSON.parse(saved) : null;
-  });
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const login = useCallback((email: string, password: string) => {
-    const found = MOCK_USERS.find(u => u.email === email && u.password === password && u.status === 'active');
-    if (found) {
-      const { password: _, ...userData } = found;
-      setUser(userData);
-      localStorage.setItem('music-school-user', JSON.stringify(userData));
-      return true;
-    }
-    return false;
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        const profile = await fetchProfile(session.user.id);
+        if (profile && profile.status === 'active') {
+          setUser(profile);
+        } else {
+          setUser(null);
+          await supabase.auth.signOut();
+        }
+      } else {
+        setUser(null);
+      }
+      setLoading(false);
+    });
+
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) {
+        const profile = await fetchProfile(session.user.id);
+        if (profile && profile.status === 'active') {
+          setUser(profile);
+        }
+      }
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const logout = useCallback(() => {
+  const login = useCallback(async (email: string, password: string): Promise<boolean> => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error || !data.user) return false;
+    const profile = await fetchProfile(data.user.id);
+    if (!profile || profile.status !== 'active') {
+      await supabase.auth.signOut();
+      return false;
+    }
+    setUser(profile);
+    return true;
+  }, []);
+
+  const logout = useCallback(async () => {
+    await supabase.auth.signOut();
     setUser(null);
-    localStorage.removeItem('music-school-user');
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user, loading }}>
       {children}
     </AuthContext.Provider>
   );

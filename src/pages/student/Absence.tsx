@@ -1,53 +1,58 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useData } from '@/contexts/DataContext';
+import { useSchedules, useProfiles, createNotification } from '@/hooks/useSupabaseData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AlertTriangle, CheckCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 const DAYS = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 
 export default function StudentAbsence() {
   const { user } = useAuth();
-  const { schedules, users, addNotification } = useData();
+  const { data: schedules } = useSchedules();
+  const { data: profiles } = useProfiles();
   const [selectedSchedule, setSelectedSchedule] = useState('');
   const [date, setDate] = useState('');
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
 
-  const mySchedules = schedules.filter(s => s.studentId === user?.id);
+  const mySchedules = schedules.filter(s => s.student_id === user?.id);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedSchedule || !date) return;
+    if (!selectedSchedule || !date || !user) return;
+    setSending(true);
 
-    const schedule = mySchedules.find(s => s.id === selectedSchedule);
-    if (schedule) {
-      // Notify teacher
-      addNotification(
-        schedule.teacherId,
-        `${user?.name} avisou que faltará à aula de ${new Date(date).toLocaleDateString('pt-PT')}.`,
-        'absence'
-      );
-      // Notify admin (id '1')
-      addNotification(
-        '1',
-        `${user?.name} avisou que faltará à aula de ${new Date(date).toLocaleDateString('pt-PT')}.`,
-        'absence'
-      );
+    try {
+      const schedule = mySchedules.find(s => s.id === selectedSchedule);
+      if (schedule) {
+        const dateStr = new Date(date).toLocaleDateString('pt-PT');
+        // Notify teacher
+        await createNotification(schedule.teacher_id, `${user.name} avisou que faltará à aula de ${dateStr}.`, 'absence');
+        // Notify admins
+        const admins = profiles.filter(p => p.role === 'admin');
+        for (const admin of admins) {
+          await createNotification(admin.id, `${user.name} avisou que faltará à aula de ${dateStr}.`, 'absence');
+        }
+      }
+      setSent(true);
+      toast.success('Aviso enviado com sucesso!');
+      setTimeout(() => setSent(false), 3000);
+      setSelectedSchedule('');
+      setDate('');
+    } catch (err: any) {
+      toast.error(err.message);
     }
-    setSent(true);
-    setTimeout(() => setSent(false), 3000);
-    setSelectedSchedule('');
-    setDate('');
+    setSending(false);
   };
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-display font-bold">Avisar Falta</h1>
-
       <Card className="max-w-md">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
@@ -69,10 +74,10 @@ export default function StudentAbsence() {
                   <SelectTrigger><SelectValue placeholder="Selecionar aula..." /></SelectTrigger>
                   <SelectContent>
                     {mySchedules.map(s => {
-                      const teacher = users.find(u => u.id === s.teacherId);
+                      const teacher = profiles.find(u => u.id === s.teacher_id);
                       return (
                         <SelectItem key={s.id} value={s.id}>
-                          {DAYS[s.dayOfWeek]} {s.startTime} — Prof. {teacher?.name}
+                          {DAYS[s.day_of_week]} {s.start_time} — Prof. {teacher?.name}
                         </SelectItem>
                       );
                     })}
@@ -83,7 +88,10 @@ export default function StudentAbsence() {
                 <Label>Data da Falta</Label>
                 <Input type="date" value={date} onChange={e => setDate(e.target.value)} />
               </div>
-              <Button type="submit" className="w-full">Enviar Aviso</Button>
+              <Button type="submit" className="w-full" disabled={sending}>
+                {sending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                Enviar Aviso
+              </Button>
             </form>
           )}
         </CardContent>

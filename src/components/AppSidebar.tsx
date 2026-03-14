@@ -1,24 +1,17 @@
 import { useAuth } from '@/contexts/AuthContext';
-import { useData } from '@/contexts/DataContext';
+import { useNotifications } from '@/hooks/useSupabaseData';
 import { NavLink } from '@/components/NavLink';
-import { useLocation } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarFooter,
-  useSidebar,
+  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
+  SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem,
+  SidebarFooter, useSidebar,
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import {
   LayoutDashboard, Users, DoorOpen, CalendarDays,
   BookOpen, Star, FileText, Calendar, AlertTriangle,
-  LogOut, Bell
+  LogOut, Bell, RotateCcw
 } from 'lucide-react';
 import logoGrt from '@/assets/logo-grt.jpg';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -34,6 +27,7 @@ const adminItems: NavItem[] = [
   { title: 'Utilizadores', url: '/admin/utilizadores', icon: Users },
   { title: 'Salas', url: '/admin/salas', icon: DoorOpen },
   { title: 'Horários', url: '/admin/horarios', icon: CalendarDays },
+  { title: 'Reposições', url: '/admin/reposicoes', icon: RotateCcw },
 ];
 
 const teacherItems: NavItem[] = [
@@ -53,21 +47,23 @@ const studentItems: NavItem[] = [
 
 export function AppSidebar() {
   const { user, logout } = useAuth();
-  const { notifications, setNotifications } = useData();
+  const { data: notifications, refetch: refetchNotifs } = useNotifications(user?.id);
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
-  const location = useLocation();
 
   if (!user) return null;
 
   const items = user.role === 'admin' ? adminItems : user.role === 'teacher' ? teacherItems : studentItems;
   const roleLabel = user.role === 'admin' ? 'Administração' : user.role === 'teacher' ? 'Professor' : 'Aluno';
 
-  const userNotifs = notifications.filter(n => n.userId === user.id);
-  const unreadCount = userNotifs.filter(n => !n.read).length;
+  const unreadCount = notifications.filter(n => !n.read).length;
 
-  const markAllRead = () => {
-    setNotifications(prev => prev.map(n => n.userId === user.id ? { ...n, read: true } : n));
+  const markAllRead = async () => {
+    await (supabase.from('notifications') as any)
+      .update({ read: true })
+      .eq('user_id', user.id)
+      .eq('read', false);
+    refetchNotifs();
   };
 
   return (
@@ -129,14 +125,14 @@ export function AppSidebar() {
               )}
             </div>
             <div className="max-h-60 overflow-y-auto">
-              {userNotifs.length === 0 ? (
+              {notifications.length === 0 ? (
                 <p className="p-4 text-sm text-muted-foreground text-center">Sem notificações</p>
               ) : (
-                userNotifs.map(n => (
+                notifications.map(n => (
                   <div key={n.id} className={`p-3 border-b last:border-0 text-sm ${n.read ? 'opacity-60' : ''}`}>
                     <p className="text-foreground">{n.message}</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {new Date(n.createdAt).toLocaleDateString('pt-PT')}
+                      {new Date(n.created_at).toLocaleDateString('pt-PT')}
                     </p>
                   </div>
                 ))
