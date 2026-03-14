@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useData, type Evaluation } from '@/contexts/DataContext';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useSchedules, useEvaluations, useProfiles } from '@/hooks/useSupabaseData';
+import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,7 +10,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Star } from 'lucide-react';
+import { Plus, Star, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 function RatingStars({ value }: { value: number }) {
   return (
@@ -24,30 +26,43 @@ function RatingStars({ value }: { value: number }) {
 
 export default function TeacherEvaluations() {
   const { user } = useAuth();
-  const { schedules, evaluations, setEvaluations, users } = useData();
+  const { data: schedules } = useSchedules();
+  const { data: evaluations, loading, refetch } = useEvaluations();
+  const { data: profiles } = useProfiles();
 
-  const mySchedules = schedules.filter(s => s.teacherId === user?.id);
-  const myStudentIds = [...new Set(mySchedules.map(s => s.studentId))];
-  const myEvals = evaluations.filter(e => e.teacherId === user?.id);
+  const mySchedules = schedules.filter(s => s.teacher_id === user?.id);
+  const myStudentIds = [...new Set(mySchedules.map(s => s.student_id))];
+  const myEvals = evaluations.filter(e => e.teacher_id === user?.id);
 
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [form, setForm] = useState({ studentId: '', technique: 5, theory: 5, commitment: 5, notes: '' });
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ student_id: '', technique: 5, theory: 5, commitment: 5, notes: '' });
 
-  const handleSave = () => {
-    const newEval: Evaluation = {
-      id: `e${Date.now()}`,
-      teacherId: user!.id,
-      studentId: form.studentId,
-      date: new Date().toISOString().split('T')[0],
-      technique: form.technique,
-      theory: form.theory,
-      commitment: form.commitment,
-      notes: form.notes,
-    };
-    setEvaluations(prev => [...prev, newEval]);
-    setDialogOpen(false);
-    setForm({ studentId: '', technique: 5, theory: 5, commitment: 5, notes: '' });
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await (supabase.from('evaluations') as any).insert({
+        teacher_id: user!.id,
+        student_id: form.student_id,
+        date: new Date().toISOString().split('T')[0],
+        technique: form.technique,
+        theory: form.theory,
+        commitment: form.commitment,
+        notes: form.notes,
+      });
+      toast.success('Avaliação guardada.');
+      refetch();
+      setDialogOpen(false);
+      setForm({ student_id: '', technique: 5, theory: 5, commitment: 5, notes: '' });
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+    setSaving(false);
   };
+
+  if (loading) {
+    return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -65,11 +80,11 @@ export default function TeacherEvaluations() {
             <div className="space-y-4 pt-2">
               <div className="space-y-2">
                 <Label>Aluno</Label>
-                <Select value={form.studentId} onValueChange={v => setForm(f => ({ ...f, studentId: v }))}>
+                <Select value={form.student_id} onValueChange={v => setForm(f => ({ ...f, student_id: v }))}>
                   <SelectTrigger><SelectValue placeholder="Selecionar..." /></SelectTrigger>
                   <SelectContent>
                     {myStudentIds.map(sid => {
-                      const s = users.find(u => u.id === sid);
+                      const s = profiles.find(u => u.id === sid);
                       return <SelectItem key={sid} value={sid}>{s?.name}</SelectItem>;
                     })}
                   </SelectContent>
@@ -89,7 +104,10 @@ export default function TeacherEvaluations() {
                 <Label>Observações</Label>
                 <Textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
               </div>
-              <Button onClick={handleSave} className="w-full">Guardar</Button>
+              <Button onClick={handleSave} className="w-full" disabled={saving}>
+                {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                Guardar
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -112,13 +130,18 @@ export default function TeacherEvaluations() {
               {myEvals.map(ev => (
                 <TableRow key={ev.id}>
                   <TableCell>{new Date(ev.date).toLocaleDateString('pt-PT')}</TableCell>
-                  <TableCell className="font-medium">{users.find(u => u.id === ev.studentId)?.name}</TableCell>
+                  <TableCell className="font-medium">{profiles.find(u => u.id === ev.student_id)?.name}</TableCell>
                   <TableCell><RatingStars value={ev.technique} /></TableCell>
                   <TableCell><RatingStars value={ev.theory} /></TableCell>
                   <TableCell><RatingStars value={ev.commitment} /></TableCell>
                   <TableCell className="text-muted-foreground max-w-[200px] truncate">{ev.notes || '—'}</TableCell>
                 </TableRow>
               ))}
+              {myEvals.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">Sem avaliações.</TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useData, type AppUser } from '@/contexts/DataContext';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useProfiles } from '@/hooks/useSupabaseData';
+import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,17 +9,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Pencil, Archive, RotateCcw } from 'lucide-react';
+import { Plus, Pencil, Archive, RotateCcw, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function AdminUsers() {
-  const { users, setUsers } = useData();
+  const { data: profiles, loading, refetch } = useProfiles();
   const [filter, setFilter] = useState<'all' | 'teacher' | 'student'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'archived'>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<AppUser | null>(null);
-  const [form, setForm] = useState({ name: '', email: '', role: 'student' as 'teacher' | 'student', status: 'active' as 'active' | 'archived' });
+  const [editing, setEditing] = useState<any | null>(null);
+  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'student' as 'teacher' | 'student' });
+  const [saving, setSaving] = useState(false);
 
-  const filtered = users.filter(u => {
+  const filtered = profiles.filter(u => {
     if (u.role === 'admin') return false;
     if (filter !== 'all' && u.role !== filter) return false;
     if (statusFilter !== 'all' && u.status !== statusFilter) return false;
@@ -27,29 +30,50 @@ export default function AdminUsers() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ name: '', email: '', role: 'student', status: 'active' });
+    setForm({ name: '', email: '', password: '', role: 'student' });
     setDialogOpen(true);
   };
 
-  const openEdit = (user: AppUser) => {
+  const openEdit = (user: any) => {
     setEditing(user);
-    setForm({ name: user.name, email: user.email, role: user.role as 'teacher' | 'student', status: user.status });
+    setForm({ name: user.name, email: user.email, password: '', role: user.role as 'teacher' | 'student' });
     setDialogOpen(true);
   };
 
-  const handleSave = () => {
-    if (editing) {
-      setUsers(prev => prev.map(u => u.id === editing.id ? { ...u, ...form } : u));
-    } else {
-      const newUser: AppUser = { id: `u${Date.now()}`, ...form };
-      setUsers(prev => [...prev, newUser]);
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      if (editing) {
+        await (supabase.from('profiles') as any).update({ name: form.name, email: form.email }).eq('id', editing.id);
+        toast.success('Utilizador atualizado.');
+      } else {
+        // Create new user via auth signup
+        const { data, error } = await supabase.auth.signUp({
+          email: form.email,
+          password: form.password,
+          options: { data: { name: form.name, role: form.role } },
+        });
+        if (error) throw error;
+        toast.success('Utilizador criado com sucesso.');
+      }
+      refetch();
+      setDialogOpen(false);
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao guardar.');
     }
-    setDialogOpen(false);
+    setSaving(false);
   };
 
-  const toggleArchive = (user: AppUser) => {
-    setUsers(prev => prev.map(u => u.id === user.id ? { ...u, status: u.status === 'active' ? 'archived' : 'active' } : u));
+  const toggleArchive = async (user: any) => {
+    const newStatus = user.status === 'active' ? 'archived' : 'active';
+    await (supabase.from('profiles') as any).update({ status: newStatus }).eq('id', user.id);
+    refetch();
+    toast.success(newStatus === 'archived' ? 'Utilizador arquivado.' : 'Utilizador reativado.');
   };
+
+  if (loading) {
+    return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -70,11 +94,17 @@ export default function AdminUsers() {
               </div>
               <div className="space-y-2">
                 <Label>Email</Label>
-                <Input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
+                <Input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} disabled={!!editing} />
               </div>
+              {!editing && (
+                <div className="space-y-2">
+                  <Label>Palavra-passe</Label>
+                  <Input type="password" value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} />
+                </div>
+              )}
               <div className="space-y-2">
                 <Label>Tipo</Label>
-                <Select value={form.role} onValueChange={v => setForm(f => ({ ...f, role: v as 'teacher' | 'student' }))}>
+                <Select value={form.role} onValueChange={v => setForm(f => ({ ...f, role: v as 'teacher' | 'student' }))} disabled={!!editing}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="teacher">Professor</SelectItem>
@@ -82,7 +112,10 @@ export default function AdminUsers() {
                   </SelectContent>
                 </Select>
               </div>
-              <Button onClick={handleSave} className="w-full">Guardar</Button>
+              <Button onClick={handleSave} className="w-full" disabled={saving}>
+                {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                Guardar
+              </Button>
             </div>
           </DialogContent>
         </Dialog>

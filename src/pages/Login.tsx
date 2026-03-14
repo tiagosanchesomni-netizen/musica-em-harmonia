@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import logoGrt from '@/assets/logo-grt.jpg';
 
 export default function Login() {
@@ -13,14 +13,17 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    const success = login(email, password);
+    setSubmitting(true);
+    const success = await login(email, password);
     if (!success) {
       setError('Email ou palavra-passe incorretos.');
     }
+    setSubmitting(false);
   };
 
   return (
@@ -69,7 +72,8 @@ export default function Login() {
             {error && (
               <p className="text-sm text-destructive">{error}</p>
             )}
-            <Button type="submit" className="w-full">
+            <Button type="submit" className="w-full" disabled={submitting}>
+              {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Entrar
             </Button>
           </form>

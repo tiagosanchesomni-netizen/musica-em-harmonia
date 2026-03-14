@@ -1,11 +1,20 @@
-import { useData } from '@/contexts/DataContext';
+import { useProfiles, useRooms, useSchedules, useClassRecords } from '@/hooks/useSupabaseData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, DoorOpen, CalendarDays, AlertTriangle } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 export default function AdminDashboard() {
-  const { users, rooms, schedules, classRecords } = useData();
-  const activeUsers = users.filter(u => u.status === 'active');
-  const pendingReschedules = classRecords.filter(r => r.reschedulePending);
+  const { data: profiles, loading: lp } = useProfiles();
+  const { data: rooms, loading: lr } = useRooms();
+  const { data: schedules, loading: ls } = useSchedules();
+  const { data: classRecords, loading: lc } = useClassRecords();
+
+  if (lp || lr || ls || lc) {
+    return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
+  }
+
+  const activeUsers = profiles.filter(u => u.status === 'active');
+  const pendingReschedules = classRecords.filter(r => r.reschedule_pending);
 
   const stats = [
     { label: 'Professores Ativos', value: activeUsers.filter(u => u.role === 'teacher').length, icon: Users, color: 'text-status-scheduled' },
@@ -17,7 +26,6 @@ export default function AdminDashboard() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-display font-bold">Painel de Gestão</h1>
-
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map(s => (
           <Card key={s.label}>
@@ -45,9 +53,9 @@ export default function AdminDashboard() {
           <CardContent>
             <div className="space-y-2">
               {pendingReschedules.map(r => {
-                const schedule = schedules.find(s => s.id === r.scheduleId);
-                const student = users.find(u => u.id === schedule?.studentId);
-                const teacher = users.find(u => u.id === schedule?.teacherId);
+                const schedule = schedules.find(s => s.id === r.schedule_id);
+                const student = profiles.find(u => u.id === schedule?.student_id);
+                const teacher = profiles.find(u => u.id === schedule?.teacher_id);
                 return (
                   <div key={r.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                     <div>

@@ -1,15 +1,21 @@
 import { useAuth } from '@/contexts/AuthContext';
-import { useData } from '@/contexts/DataContext';
+import { useSchedules, useClassRecords, useProfiles } from '@/hooks/useSupabaseData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, BookOpen, FileText } from 'lucide-react';
+import { Users, BookOpen, FileText, Loader2 } from 'lucide-react';
 
 export default function TeacherDashboard() {
   const { user } = useAuth();
-  const { schedules, classRecords, users } = useData();
+  const { data: schedules, loading: ls } = useSchedules();
+  const { data: classRecords, loading: lc } = useClassRecords();
+  const { data: profiles, loading: lp } = useProfiles();
 
-  const mySchedules = schedules.filter(s => s.teacherId === user?.id);
-  const myStudentIds = [...new Set(mySchedules.map(s => s.studentId))];
-  const myRecords = classRecords.filter(r => mySchedules.some(s => s.id === r.scheduleId));
+  if (ls || lc || lp) {
+    return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
+  }
+
+  const mySchedules = schedules.filter(s => s.teacher_id === user?.id);
+  const myStudentIds = [...new Set(mySchedules.map(s => s.student_id))];
+  const myRecords = classRecords.filter(r => mySchedules.some(s => s.id === r.schedule_id));
   const taughtCount = myRecords.filter(r => r.status === 'taught').length;
   const scheduledCount = myRecords.filter(r => r.status === 'scheduled').length;
 
@@ -59,8 +65,8 @@ export default function TeacherDashboard() {
         <CardContent>
           <div className="space-y-2">
             {myStudentIds.map(sid => {
-              const student = users.find(u => u.id === sid);
-              const studentSchedule = mySchedules.find(s => s.studentId === sid);
+              const student = profiles.find(u => u.id === sid);
+              const studentSchedule = mySchedules.find(s => s.student_id === sid);
               return (
                 <div key={sid} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                   <span className="text-sm font-medium">{student?.name}</span>
@@ -70,6 +76,9 @@ export default function TeacherDashboard() {
                 </div>
               );
             })}
+            {myStudentIds.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">Nenhum aluno atribuído.</p>
+            )}
           </div>
         </CardContent>
       </Card>

@@ -1,68 +1,86 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useData, type ClassRecord } from '@/contexts/DataContext';
+import { useSchedules, useClassRecords, useProfiles, useClassAttachments, uploadClassDocument } from '@/hooks/useSupabaseData';
+import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Pencil } from 'lucide-react';
+import { Pencil, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
-const statusLabels: Record<ClassRecord['status'], string> = {
-  taught: 'Dada',
-  canceled: 'Cancelada',
-  scheduled: 'Agendada',
-};
-
-const statusColors: Record<ClassRecord['status'], string> = {
+const statusLabels: Record<string, string> = { taught: 'Dada', canceled: 'Cancelada', scheduled: 'Agendada' };
+const statusColors: Record<string, string> = {
   taught: 'bg-status-taught text-status-taught-foreground',
   canceled: 'bg-status-canceled text-status-canceled-foreground',
   scheduled: 'bg-status-scheduled text-status-scheduled-foreground',
 };
-
-const attendanceLabels: Record<string, string> = {
-  present: 'Presente',
-  absent: 'Faltou',
-};
+const attendanceLabels: Record<string, string> = { present: 'Presente', absent: 'Faltou' };
 
 export default function TeacherSummaries() {
   const { user } = useAuth();
-  const { schedules, classRecords, setClassRecords, users } = useData();
+  const { data: schedules } = useSchedules();
+  const { data: classRecords, loading, refetch } = useClassRecords();
+  const { data: profiles } = useProfiles();
+  const { data: attachments, refetch: refetchAtt } = useClassAttachments();
 
-  const mySchedules = schedules.filter(s => s.teacherId === user?.id);
-  const myRecords = classRecords.filter(r => mySchedules.some(s => s.id === r.scheduleId));
+  const mySchedules = schedules.filter(s => s.teacher_id === user?.id);
+  const myRecords = classRecords.filter(r => mySchedules.some(s => s.id === r.schedule_id));
 
-  const [editRecord, setEditRecord] = useState<ClassRecord | null>(null);
-  const [form, setForm] = useState({ summary: '', status: 'scheduled' as ClassRecord['status'], attendance: '' as string });
+  const [editRecord, setEditRecord] = useState<any>(null);
+  const [form, setForm] = useState({ summary: '', status: 'scheduled', attendance: '' });
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  const openEdit = (record: ClassRecord) => {
+  const openEdit = (record: any) => {
     setEditRecord(record);
-    setForm({
-      summary: record.summary,
-      status: record.status,
-      attendance: record.attendance || '',
-    });
+    setForm({ summary: record.summary || '', status: record.status, attendance: record.attendance || '' });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!editRecord) return;
-    setClassRecords(prev => prev.map(r =>
-      r.id === editRecord.id
-        ? {
-            ...r,
-            summary: form.summary,
-            status: form.status,
-            attendance: form.attendance as ClassRecord['attendance'],
-            reschedulePending: form.status === 'canceled',
-          }
-        : r
-    ));
-    setEditRecord(null);
+    setSaving(true);
+    try {
+      await (supabase.from('class_records') as any).update({
+        summary: form.summary,
+        status: form.status,
+        attendance: form.attendance || null,
+        reschedule_pending: form.status === 'canceled',
+        updated_at: new Date().toISOString(),
+      }).eq('id', editRecord.id);
+      toast.success('Sumário guardado.');
+      refetch();
+      setEditRecord(null);
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+    setSaving(false);
   };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || !editRecord || !user) return;
+    setUploading(true);
+    try {
+      for (const file of Array.from(e.target.files)) {
+        await uploadClassDocument(file, editRecord.id, user.id);
+      }
+      toast.success('Ficheiro(s) carregado(s).');
+      refetchAtt();
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+    setUploading(false);
+    if (fileRef.current) fileRef.current.value = '';
+  };
+
+  if (loading) {
+    return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -84,8 +102,9 @@ export default function TeacherSummaries() {
             </TableHeader>
             <TableBody>
               {myRecords.map(record => {
-                const schedule = mySchedules.find(s => s.id === record.scheduleId);
-                const student = users.find(u => u.id === schedule?.studentId);
+                const schedule = mySchedules.find(s => s.id === record.schedule_id);
+                const student = profiles.find(u => u.id === schedule?.student_id);
+                const recordAttachments = attachments.filter(a => a.class_record_id === record.id);
                 return (
                   <TableRow key={record.id}>
                     <TableCell>{new Date(record.date).toLocaleDateString('pt-PT')}</TableCell>
@@ -94,19 +113,19 @@ export default function TeacherSummaries() {
                       {record.summary || '—'}
                     </TableCell>
                     <TableCell>
-                      <span className={`text-xs font-medium px-2 py-1 rounded-full ${statusColors[record.status]}`}>
-                        {statusLabels[record.status]}
+                      <span className={`text-xs font-medium px-2 py-1 rounded-full ${statusColors[record.status] || ''}`}>
+                        {statusLabels[record.status] || record.status}
                       </span>
                     </TableCell>
                     <TableCell>
                       {record.attendance ? (
                         <Badge variant={record.attendance === 'present' ? 'default' : 'destructive'}>
-                          {attendanceLabels[record.attendance]}
+                          {attendanceLabels[record.attendance] || record.attendance}
                         </Badge>
                       ) : '—'}
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
-                      {record.attachments.length > 0 ? `${record.attachments.length} ficheiro(s)` : '—'}
+                      {recordAttachments.length > 0 ? `${recordAttachments.length} ficheiro(s)` : '—'}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button size="icon" variant="ghost" onClick={() => openEdit(record)}>
@@ -116,6 +135,13 @@ export default function TeacherSummaries() {
                   </TableRow>
                 );
               })}
+              {myRecords.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                    Sem registos de aulas.
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>
@@ -131,7 +157,7 @@ export default function TeacherSummaries() {
             </div>
             <div className="space-y-2">
               <Label>Estado da Aula</Label>
-              <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v as ClassRecord['status'] }))}>
+              <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="taught">Dada</SelectItem>
@@ -150,7 +176,17 @@ export default function TeacherSummaries() {
                 </SelectContent>
               </Select>
             </div>
-            <Button onClick={handleSave} className="w-full">Guardar</Button>
+            <div className="space-y-2">
+              <Label>Anexar Ficheiros</Label>
+              <div className="flex items-center gap-2">
+                <input ref={fileRef} type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.gif" onChange={handleFileUpload} className="text-sm" />
+                {uploading && <Loader2 className="w-4 h-4 animate-spin" />}
+              </div>
+            </div>
+            <Button onClick={handleSave} className="w-full" disabled={saving}>
+              {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Guardar
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
