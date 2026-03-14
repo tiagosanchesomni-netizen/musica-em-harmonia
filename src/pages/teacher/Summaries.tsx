@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Pencil, Upload, Loader2 } from 'lucide-react';
+import { Pencil, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 const statusLabels: Record<string, string> = { taught: 'Dada', canceled: 'Cancelada', scheduled: 'Agendada' };

@@ -20,7 +20,7 @@ import StudentCalendar from "@/pages/student/Calendar";
 import StudentSummaries from "@/pages/student/Summaries";
 import StudentDocuments from "@/pages/student/Documents";
 import StudentAbsence from "@/pages/student/Absence";
-import NotFound from "./pages/NotFound";
+
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();

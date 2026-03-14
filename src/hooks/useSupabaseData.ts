@@ -18,7 +18,7 @@ export function useSupabaseQuery<T>(
   const fetch = useCallback(async () => {
     if (options?.enabled === false) return;
     setLoading(true);
-    let query = (supabase.from(table) as any).select(options?.select || '*');
+    let query = (supabase as any).from(table).select(options?.select || '*');
     if (options?.filters) {
       for (const f of options.filters) {
         query = query.filter(f.column, f.op, f.value);
