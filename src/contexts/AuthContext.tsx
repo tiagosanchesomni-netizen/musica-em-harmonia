@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-
 export type UserRole = 'admin' | 'teacher' | 'student';
 
 export interface User {
@@ -10,6 +9,7 @@ export interface User {
   name: string;
   role: UserRole;
   status: 'active' | 'archived';
+  must_change_password: boolean;
 }
 
 interface AuthContextType {
@@ -18,6 +18,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   isAuthenticated: boolean;
   loading: boolean;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -35,6 +36,7 @@ async function fetchProfile(userId: string): Promise<User | null> {
     name: data.name,
     role: data.role as UserRole,
     status: data.status as 'active' | 'archived',
+    must_change_password: (data as any).must_change_password ?? false,
   };
 }
 
@@ -88,8 +90,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }, []);
 
+  const refreshProfile = useCallback(async () => {
+    if (!user) return;
+    const profile = await fetchProfile(user.id);
+    if (profile) setUser(profile);
+  }, [user]);
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user, loading }}>
+    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user, loading, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

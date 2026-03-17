@@ -1,5 +1,5 @@
 import { useAuth } from '@/contexts/AuthContext';
-import { useSchedules, useClassRecords, useProfiles, useRooms } from '@/hooks/useSupabaseData';
+import { useSchedules, useClassRecords, useProfiles, useRooms, useScheduleStudents, useScheduleTeachers, getScheduleTeacherIds } from '@/hooks/useSupabaseData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 
@@ -11,13 +11,16 @@ export default function StudentCalendar() {
   const { data: classRecords, loading: lc } = useClassRecords();
   const { data: profiles } = useProfiles();
   const { data: rooms } = useRooms();
+  const { data: scheduleStudents } = useScheduleStudents();
+  const { data: scheduleTeachers } = useScheduleTeachers();
 
   if (ls || lc) {
     return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
   }
 
-  const mySchedules = schedules.filter(s => s.student_id === user?.id);
-  const myRecords = classRecords.filter(r => mySchedules.some(s => s.id === r.schedule_id));
+  const myScheduleIds = scheduleStudents.filter(ss => ss.student_id === user?.id).map(ss => ss.schedule_id);
+  const mySchedules = schedules.filter(s => myScheduleIds.includes(s.id));
+  const myRecords = classRecords.filter(r => myScheduleIds.includes(r.schedule_id));
 
   const statusLabels: Record<string, string> = { taught: 'Dada', canceled: 'Cancelada', scheduled: 'Agendada' };
   const statusColors: Record<string, string> = {
@@ -31,7 +34,8 @@ export default function StudentCalendar() {
       <h1 className="text-2xl font-display font-bold">Calendário</h1>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {mySchedules.map(s => {
-          const teacher = profiles.find(u => u.id === s.teacher_id);
+          const teacherIds = getScheduleTeacherIds(s.id, scheduleTeachers);
+          const teacherNames = teacherIds.map(id => profiles.find(u => u.id === id)?.name).filter(Boolean).join(', ');
           const room = rooms.find(r => r.id === s.room_id);
           const records = myRecords.filter(r => r.schedule_id === s.id);
           return (
@@ -40,7 +44,7 @@ export default function StudentCalendar() {
                 <CardTitle className="text-base">
                   {DAYS[s.day_of_week]} — {s.start_time} às {s.end_time}
                 </CardTitle>
-                <p className="text-xs text-muted-foreground">Prof. {teacher?.name} • {room?.name}</p>
+                <p className="text-xs text-muted-foreground">Prof. {teacherNames} • {room?.name}</p>
               </CardHeader>
               <CardContent>
                 {records.length === 0 ? (

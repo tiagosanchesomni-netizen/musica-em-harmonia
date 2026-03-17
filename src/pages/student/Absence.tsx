@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useSchedules, useProfiles, createNotification } from '@/hooks/useSupabaseData';
+import { useSchedules, useProfiles, createNotification, useScheduleStudents, useScheduleTeachers, getScheduleTeacherIds } from '@/hooks/useSupabaseData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,12 +15,15 @@ export default function StudentAbsence() {
   const { user } = useAuth();
   const { data: schedules } = useSchedules();
   const { data: profiles } = useProfiles();
+  const { data: scheduleStudents } = useScheduleStudents();
+  const { data: scheduleTeachers } = useScheduleTeachers();
   const [selectedSchedule, setSelectedSchedule] = useState('');
   const [date, setDate] = useState('');
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
 
-  const mySchedules = schedules.filter(s => s.student_id === user?.id);
+  const myScheduleIds = scheduleStudents.filter(ss => ss.student_id === user?.id).map(ss => ss.schedule_id);
+  const mySchedules = schedules.filter(s => myScheduleIds.includes(s.id));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,8 +34,11 @@ export default function StudentAbsence() {
       const schedule = mySchedules.find(s => s.id === selectedSchedule);
       if (schedule) {
         const dateStr = new Date(date).toLocaleDateString('pt-PT');
-        // Notify teacher
-        await createNotification(schedule.teacher_id, `${user.name} avisou que faltará à aula de ${dateStr}.`, 'absence');
+        // Notify all teachers of this schedule
+        const teacherIds = getScheduleTeacherIds(schedule.id, scheduleTeachers);
+        for (const tid of teacherIds) {
+          await createNotification(tid, `${user.name} avisou que faltará à aula de ${dateStr}.`, 'absence');
+        }
         // Notify admins
         const admins = profiles.filter(p => p.role === 'admin');
         for (const admin of admins) {
@@ -74,10 +80,11 @@ export default function StudentAbsence() {
                   <SelectTrigger><SelectValue placeholder="Selecionar aula..." /></SelectTrigger>
                   <SelectContent>
                     {mySchedules.map(s => {
-                      const teacher = profiles.find(u => u.id === s.teacher_id);
+                      const teacherIds = getScheduleTeacherIds(s.id, scheduleTeachers);
+                      const teacherNames = teacherIds.map(id => profiles.find(u => u.id === id)?.name).filter(Boolean).join(', ');
                       return (
                         <SelectItem key={s.id} value={s.id}>
-                          {DAYS[s.day_of_week]} {s.start_time} — Prof. {teacher?.name}
+                          {DAYS[s.day_of_week]} {s.start_time} — Prof. {teacherNames}
                         </SelectItem>
                       );
                     })}

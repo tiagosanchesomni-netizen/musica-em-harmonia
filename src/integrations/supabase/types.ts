@@ -194,6 +194,7 @@ export type Database = {
           created_at: string
           email: string
           id: string
+          must_change_password: boolean
           name: string
           role: Database["public"]["Enums"]["app_role"]
           status: string
@@ -203,6 +204,7 @@ export type Database = {
           created_at?: string
           email: string
           id: string
+          must_change_password?: boolean
           name: string
           role?: Database["public"]["Enums"]["app_role"]
           status?: string
@@ -212,6 +214,7 @@ export type Database = {
           created_at?: string
           email?: string
           id?: string
+          must_change_password?: boolean
           name?: string
           role?: Database["public"]["Enums"]["app_role"]
           status?: string
@@ -288,6 +291,78 @@ export type Database = {
         }
         Relationships: []
       }
+      schedule_students: {
+        Row: {
+          created_at: string
+          id: string
+          schedule_id: string
+          student_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          schedule_id: string
+          student_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          schedule_id?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedule_students_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "schedules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_students_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      schedule_teachers: {
+        Row: {
+          created_at: string
+          id: string
+          schedule_id: string
+          teacher_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          schedule_id: string
+          teacher_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          schedule_id?: string
+          teacher_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedule_teachers_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "schedules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_teachers_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       schedules: {
         Row: {
           created_at: string
@@ -298,8 +373,8 @@ export type Database = {
           recurring: boolean
           room_id: string
           start_time: string
-          student_id: string
-          teacher_id: string
+          student_id: string | null
+          teacher_id: string | null
         }
         Insert: {
           created_at?: string
@@ -310,8 +385,8 @@ export type Database = {
           recurring?: boolean
           room_id: string
           start_time: string
-          student_id: string
-          teacher_id: string
+          student_id?: string | null
+          teacher_id?: string | null
         }
         Update: {
           created_at?: string
@@ -322,8 +397,8 @@ export type Database = {
           recurring?: boolean
           room_id?: string
           start_time?: string
-          student_id?: string
-          teacher_id?: string
+          student_id?: string | null
+          teacher_id?: string | null
         }
         Relationships: [
           {

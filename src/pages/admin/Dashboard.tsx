@@ -1,4 +1,4 @@
-import { useProfiles, useRooms, useSchedules, useClassRecords } from '@/hooks/useSupabaseData';
+import { useProfiles, useRooms, useSchedules, useClassRecords, useScheduleTeachers, useScheduleStudents, getScheduleTeacherIds, getScheduleStudentIds } from '@/hooks/useSupabaseData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, DoorOpen, CalendarDays, AlertTriangle } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
@@ -8,6 +8,8 @@ export default function AdminDashboard() {
   const { data: rooms, loading: lr } = useRooms();
   const { data: schedules, loading: ls } = useSchedules();
   const { data: classRecords, loading: lc } = useClassRecords();
+  const { data: scheduleTeachers } = useScheduleTeachers();
+  const { data: scheduleStudents } = useScheduleStudents();
 
   if (lp || lr || ls || lc) {
     return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
@@ -54,12 +56,14 @@ export default function AdminDashboard() {
             <div className="space-y-2">
               {pendingReschedules.map(r => {
                 const schedule = schedules.find(s => s.id === r.schedule_id);
-                const student = profiles.find(u => u.id === schedule?.student_id);
-                const teacher = profiles.find(u => u.id === schedule?.teacher_id);
+                const studentIds = schedule ? getScheduleStudentIds(schedule.id, scheduleStudents) : [];
+                const teacherIds = schedule ? getScheduleTeacherIds(schedule.id, scheduleTeachers) : [];
+                const studentNames = studentIds.map(id => profiles.find(u => u.id === id)?.name).filter(Boolean).join(', ');
+                const teacherNames = teacherIds.map(id => profiles.find(u => u.id === id)?.name).filter(Boolean).join(', ');
                 return (
                   <div key={r.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                     <div>
-                      <p className="text-sm font-medium">{student?.name} — Prof. {teacher?.name}</p>
+                      <p className="text-sm font-medium">{studentNames} — Prof. {teacherNames}</p>
                       <p className="text-xs text-muted-foreground">Aula cancelada em {new Date(r.date).toLocaleDateString('pt-PT')}</p>
                     </div>
                     <span className="text-xs font-medium px-2 py-1 rounded-full bg-status-absent/10 text-status-absent">

@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { AppLayout } from "@/components/AppLayout";
 import Login from "@/pages/Login";
+import ChangePassword from "@/pages/ChangePassword";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import AdminUsers from "@/pages/admin/Users";
 import AdminRooms from "@/pages/admin/Rooms";
@@ -40,6 +41,15 @@ function AppRoutes() {
     return (
       <Routes>
         <Route path="*" element={<Login />} />
+      </Routes>
+    );
+  }
+
+  // Force password change
+  if (user?.must_change_password) {
+    return (
+      <Routes>
+        <Route path="*" element={<ChangePassword />} />
       </Routes>
     );
   }
