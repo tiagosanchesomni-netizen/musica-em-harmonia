@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-// Generic hook for fetching data
 export function useSupabaseQuery<T>(
   table: string,
   options?: {
@@ -44,7 +43,7 @@ export function useSupabaseQuery<T>(
 // Profiles
 export function useProfiles() {
   return useSupabaseQuery<{
-    id: string; email: string; name: string; role: string; status: string; created_at: string;
+    id: string; email: string; name: string; role: string; status: string; created_at: string; must_change_password: boolean;
   }>('profiles', { orderBy: { column: 'name' } });
 }
 
@@ -58,10 +57,25 @@ export function useRooms() {
 // Schedules
 export function useSchedules() {
   return useSupabaseQuery<{
-    id: string; teacher_id: string; student_id: string; room_id: string;
+    id: string; room_id: string;
     day_of_week: number; start_time: string; end_time: string;
     recurring: boolean; date: string | null; created_at: string;
+    teacher_id: string | null; student_id: string | null;
   }>('schedules');
+}
+
+// Schedule teachers junction
+export function useScheduleTeachers() {
+  return useSupabaseQuery<{
+    id: string; schedule_id: string; teacher_id: string;
+  }>('schedule_teachers');
+}
+
+// Schedule students junction
+export function useScheduleStudents() {
+  return useSupabaseQuery<{
+    id: string; schedule_id: string; student_id: string;
+  }>('schedule_students');
 }
 
 // Class records
@@ -149,4 +163,14 @@ export async function createNotification(userId: string, message: string, type: 
     type,
   });
   if (error) throw error;
+}
+
+// Helper: get teacher IDs for a schedule
+export function getScheduleTeacherIds(scheduleId: string, scheduleTeachers: Array<{ schedule_id: string; teacher_id: string }>) {
+  return scheduleTeachers.filter(st => st.schedule_id === scheduleId).map(st => st.teacher_id);
+}
+
+// Helper: get student IDs for a schedule
+export function getScheduleStudentIds(scheduleId: string, scheduleStudents: Array<{ schedule_id: string; student_id: string }>) {
+  return scheduleStudents.filter(ss => ss.schedule_id === scheduleId).map(ss => ss.student_id);
 }
