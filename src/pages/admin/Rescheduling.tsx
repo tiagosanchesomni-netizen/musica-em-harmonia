@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useClassRecords, useSchedules, useProfiles, useRooms, useRescheduledClasses } from '@/hooks/useSupabaseData';
+import { useClassRecords, useSchedules, useProfiles, useRooms, useRescheduledClasses, useScheduleTeachers, useScheduleStudents, getScheduleTeacherIds, getScheduleStudentIds } from '@/hooks/useSupabaseData';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,8 @@ export default function AdminRescheduling() {
   const { data: profiles } = useProfiles();
   const { data: rooms, loading } = useRooms();
   const { data: rescheduled, refetch: refetchRs } = useRescheduledClasses();
+  const { data: scheduleTeachers } = useScheduleTeachers();
+  const { data: scheduleStudents } = useScheduleStudents();
 
   const pending = classRecords.filter(r => r.reschedule_pending);
 
@@ -42,7 +44,6 @@ export default function AdminRescheduling() {
         original_class_record_id: selectedRecord.id,
         ...form,
       });
-      // Mark as no longer pending
       await (supabase.from('class_records') as any).update({ reschedule_pending: false }).eq('id', selectedRecord.id);
       toast.success('Reposição agendada com sucesso.');
       refetchCr();
@@ -81,21 +82,23 @@ export default function AdminRescheduling() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Data Original</TableHead>
-                  <TableHead>Professor</TableHead>
-                  <TableHead>Aluno</TableHead>
+                  <TableHead>Professor(es)</TableHead>
+                  <TableHead>Aluno(s)</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {pending.map(r => {
                   const schedule = schedules.find(s => s.id === r.schedule_id);
-                  const teacher = profiles.find(u => u.id === schedule?.teacher_id);
-                  const student = profiles.find(u => u.id === schedule?.student_id);
+                  const teacherIds = schedule ? getScheduleTeacherIds(schedule.id, scheduleTeachers) : [];
+                  const studentIds = schedule ? getScheduleStudentIds(schedule.id, scheduleStudents) : [];
+                  const teacherNames = teacherIds.map(id => profiles.find(u => u.id === id)?.name).filter(Boolean).join(', ');
+                  const studentNames = studentIds.map(id => profiles.find(u => u.id === id)?.name).filter(Boolean).join(', ');
                   return (
                     <TableRow key={r.id}>
                       <TableCell>{new Date(r.date).toLocaleDateString('pt-PT')}</TableCell>
-                      <TableCell>{teacher?.name}</TableCell>
-                      <TableCell>{student?.name}</TableCell>
+                      <TableCell>{teacherNames || '—'}</TableCell>
+                      <TableCell>{studentNames || '—'}</TableCell>
                       <TableCell className="text-right">
                         <Button size="sm" onClick={() => openSchedule(r)}>
                           <CalendarPlus className="w-4 h-4 mr-2" />Agendar

@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useSchedules, useClassRecords, useProfiles, useClassAttachments, uploadClassDocument } from '@/hooks/useSupabaseData';
+import { useSchedules, useClassRecords, useProfiles, useClassAttachments, uploadClassDocument, useScheduleTeachers, useScheduleStudents, getScheduleStudentIds } from '@/hooks/useSupabaseData';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -27,9 +27,12 @@ export default function TeacherSummaries() {
   const { data: classRecords, loading, refetch } = useClassRecords();
   const { data: profiles } = useProfiles();
   const { data: attachments, refetch: refetchAtt } = useClassAttachments();
+  const { data: scheduleTeachers } = useScheduleTeachers();
+  const { data: scheduleStudents } = useScheduleStudents();
 
-  const mySchedules = schedules.filter(s => s.teacher_id === user?.id);
-  const myRecords = classRecords.filter(r => mySchedules.some(s => s.id === r.schedule_id));
+  const myScheduleIds = scheduleTeachers.filter(st => st.teacher_id === user?.id).map(st => st.schedule_id);
+  const mySchedules = schedules.filter(s => myScheduleIds.includes(s.id));
+  const myRecords = classRecords.filter(r => myScheduleIds.includes(r.schedule_id));
 
   const [editRecord, setEditRecord] = useState<any>(null);
   const [form, setForm] = useState({ summary: '', status: 'scheduled', attendance: '' });
@@ -92,7 +95,7 @@ export default function TeacherSummaries() {
             <TableHeader>
               <TableRow>
                 <TableHead>Data</TableHead>
-                <TableHead>Aluno</TableHead>
+                <TableHead>Aluno(s)</TableHead>
                 <TableHead>Sumário</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Assiduidade</TableHead>
@@ -103,12 +106,13 @@ export default function TeacherSummaries() {
             <TableBody>
               {myRecords.map(record => {
                 const schedule = mySchedules.find(s => s.id === record.schedule_id);
-                const student = profiles.find(u => u.id === schedule?.student_id);
+                const studentIds = schedule ? getScheduleStudentIds(schedule.id, scheduleStudents) : [];
+                const studentNames = studentIds.map(id => profiles.find(u => u.id === id)?.name).filter(Boolean).join(', ');
                 const recordAttachments = attachments.filter(a => a.class_record_id === record.id);
                 return (
                   <TableRow key={record.id}>
                     <TableCell>{new Date(record.date).toLocaleDateString('pt-PT')}</TableCell>
-                    <TableCell className="font-medium">{student?.name}</TableCell>
+                    <TableCell className="font-medium">{studentNames || '—'}</TableCell>
                     <TableCell className="max-w-[200px] truncate text-muted-foreground">
                       {record.summary || '—'}
                     </TableCell>

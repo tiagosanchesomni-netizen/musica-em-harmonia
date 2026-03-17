@@ -1,5 +1,5 @@
 import { useAuth } from '@/contexts/AuthContext';
-import { useSchedules, useClassRecords, useClassAttachments } from '@/hooks/useSupabaseData';
+import { useSchedules, useClassRecords, useClassAttachments, useScheduleStudents } from '@/hooks/useSupabaseData';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FileText, Download, Loader2 } from 'lucide-react';
@@ -9,10 +9,11 @@ export default function StudentDocuments() {
   const { data: schedules } = useSchedules();
   const { data: classRecords } = useClassRecords();
   const { data: attachments, loading } = useClassAttachments();
+  const { data: scheduleStudents } = useScheduleStudents();
 
-  const mySchedules = schedules.filter(s => s.student_id === user?.id);
+  const myScheduleIds = scheduleStudents.filter(ss => ss.student_id === user?.id).map(ss => ss.schedule_id);
   const myRecordIds = classRecords
-    .filter(r => mySchedules.some(s => s.id === r.schedule_id))
+    .filter(r => myScheduleIds.includes(r.schedule_id))
     .map(r => r.id);
   const myAttachments = attachments.filter(a => myRecordIds.includes(a.class_record_id));
 
@@ -23,7 +24,6 @@ export default function StudentDocuments() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-display font-bold">Documentos</h1>
-
       {myAttachments.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">

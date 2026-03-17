@@ -1,5 +1,5 @@
 import { useAuth } from '@/contexts/AuthContext';
-import { useSchedules, useClassRecords, useProfiles } from '@/hooks/useSupabaseData';
+import { useSchedules, useClassRecords, useProfiles, useScheduleStudents, useScheduleTeachers, getScheduleTeacherIds } from '@/hooks/useSupabaseData';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -10,13 +10,16 @@ export default function StudentSummaries() {
   const { data: schedules } = useSchedules();
   const { data: classRecords, loading } = useClassRecords();
   const { data: profiles } = useProfiles();
+  const { data: scheduleStudents } = useScheduleStudents();
+  const { data: scheduleTeachers } = useScheduleTeachers();
 
   if (loading) {
     return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
   }
 
-  const mySchedules = schedules.filter(s => s.student_id === user?.id);
-  const myRecords = classRecords.filter(r => mySchedules.some(s => s.id === r.schedule_id) && r.status === 'taught');
+  const myScheduleIds = scheduleStudents.filter(ss => ss.student_id === user?.id).map(ss => ss.schedule_id);
+  const mySchedules = schedules.filter(s => myScheduleIds.includes(s.id));
+  const myRecords = classRecords.filter(r => myScheduleIds.includes(r.schedule_id) && r.status === 'taught');
 
   return (
     <div className="space-y-6">
@@ -27,7 +30,7 @@ export default function StudentSummaries() {
             <TableHeader>
               <TableRow>
                 <TableHead>Data</TableHead>
-                <TableHead>Professor</TableHead>
+                <TableHead>Professor(es)</TableHead>
                 <TableHead>Sumário</TableHead>
                 <TableHead>Assiduidade</TableHead>
               </TableRow>
@@ -35,11 +38,12 @@ export default function StudentSummaries() {
             <TableBody>
               {myRecords.map(record => {
                 const schedule = mySchedules.find(s => s.id === record.schedule_id);
-                const teacher = profiles.find(u => u.id === schedule?.teacher_id);
+                const teacherIds = schedule ? getScheduleTeacherIds(schedule.id, scheduleTeachers) : [];
+                const teacherNames = teacherIds.map(id => profiles.find(u => u.id === id)?.name).filter(Boolean).join(', ');
                 return (
                   <TableRow key={record.id}>
                     <TableCell>{new Date(record.date).toLocaleDateString('pt-PT')}</TableCell>
-                    <TableCell className="font-medium">{teacher?.name}</TableCell>
+                    <TableCell className="font-medium">{teacherNames || '—'}</TableCell>
                     <TableCell className="text-muted-foreground">{record.summary || '—'}</TableCell>
                     <TableCell>
                       <Badge variant={record.attendance === 'present' ? 'default' : 'destructive'}>

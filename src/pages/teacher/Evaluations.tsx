@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useSchedules, useEvaluations, useProfiles } from '@/hooks/useSupabaseData';
+import { useSchedules, useEvaluations, useProfiles, useScheduleTeachers, useScheduleStudents, getScheduleStudentIds } from '@/hooks/useSupabaseData';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -29,9 +29,12 @@ export default function TeacherEvaluations() {
   const { data: schedules } = useSchedules();
   const { data: evaluations, loading, refetch } = useEvaluations();
   const { data: profiles } = useProfiles();
+  const { data: scheduleTeachers } = useScheduleTeachers();
+  const { data: scheduleStudents } = useScheduleStudents();
 
-  const mySchedules = schedules.filter(s => s.teacher_id === user?.id);
-  const myStudentIds = [...new Set(mySchedules.map(s => s.student_id))];
+  const myScheduleIds = scheduleTeachers.filter(st => st.teacher_id === user?.id).map(st => st.schedule_id);
+  const mySchedules = schedules.filter(s => myScheduleIds.includes(s.id));
+  const myStudentIds = [...new Set(mySchedules.flatMap(s => getScheduleStudentIds(s.id, scheduleStudents)))];
   const myEvals = evaluations.filter(e => e.teacher_id === user?.id);
 
   const [dialogOpen, setDialogOpen] = useState(false);
