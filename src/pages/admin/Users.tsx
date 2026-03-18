@@ -53,12 +53,11 @@ export default function AdminUsers() {
         await (supabase.from('profiles') as any).update({ name: form.name, email: form.email }).eq('id', editing.id);
         toast.success('Utilizador atualizado.');
       } else {
-        const { data, error } = await supabase.auth.signUp({
-          email: form.email,
-          password: form.password,
-          options: { data: { name: form.name, role: form.role } },
+        const resp = await supabase.functions.invoke('admin-create-user', {
+          body: { email: form.email, password: form.password, name: form.name, role: form.role },
         });
-        if (error) throw error;
+        if (resp.error) throw resp.error;
+        if (resp.data?.error) throw new Error(resp.data.error);
         toast.success('Utilizador criado com sucesso.');
       }
       refetch();
