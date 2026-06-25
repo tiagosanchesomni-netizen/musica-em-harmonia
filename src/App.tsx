@@ -3,105 +3,59 @@ import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { AppProvider } from "@/contexts/AppContext";
 import { AppLayout } from "@/components/AppLayout";
-import Login from "@/pages/Login";
-import ChangePassword from "@/pages/ChangePassword";
-import AdminDashboard from "@/pages/admin/Dashboard";
-import AdminUsers from "@/pages/admin/Users";
-import AdminRooms from "@/pages/admin/Rooms";
-import AdminSchedules from "@/pages/admin/Schedules";
-import AdminRescheduling from "@/pages/admin/Rescheduling";
-import TeacherDashboard from "@/pages/teacher/Dashboard";
-import TeacherSummaries from "@/pages/teacher/Summaries";
-import TeacherEvaluations from "@/pages/teacher/Evaluations";
-import TeacherDocuments from "@/pages/teacher/Documents";
-import StudentDashboard from "@/pages/student/Dashboard";
-import StudentCalendar from "@/pages/student/Calendar";
-import StudentSummaries from "@/pages/student/Summaries";
-import StudentDocuments from "@/pages/student/Documents";
-import StudentAbsence from "@/pages/student/Absence";
 
-import { Loader2 } from "lucide-react";
+import AdminUtilizadores from "@/pages/admin/Utilizadores";
+import AdminSalas from "@/pages/admin/Salas";
+import AdminAulas from "@/pages/admin/Aulas";
+import AdminReposicoes from "@/pages/admin/Reposicoes";
+import AdminDocumentos from "@/pages/admin/Documentos";
+import AdminNotificacoes from "@/pages/admin/Notificacoes";
+
+import ProfessorAulas from "@/pages/professor/Aulas";
+import ProfessorReposicoes from "@/pages/professor/Reposicoes";
+import ProfessorDocumentos from "@/pages/professor/Documentos";
+
+import AlunoAulas from "@/pages/aluno/Aulas";
+import AlunoReposicoes from "@/pages/aluno/Reposicoes";
+import AlunoDocumentos from "@/pages/aluno/Documentos";
+
+import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
-
-function AppRoutes() {
-  const { user, isAuthenticated, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <Routes>
-        <Route path="*" element={<Login />} />
-      </Routes>
-    );
-  }
-
-  // Force password change
-  if (user?.must_change_password) {
-    return (
-      <Routes>
-        <Route path="*" element={<ChangePassword />} />
-      </Routes>
-    );
-  }
-
-  const homeRoute = user?.role === 'admin' ? '/admin' : user?.role === 'teacher' ? '/professor' : '/aluno';
-
-  return (
-    <Routes>
-      <Route path="/" element={<Navigate to={homeRoute} replace />} />
-      <Route element={<AppLayout />}>
-        {user?.role === 'admin' && (
-          <>
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/utilizadores" element={<AdminUsers />} />
-            <Route path="/admin/salas" element={<AdminRooms />} />
-            <Route path="/admin/horarios" element={<AdminSchedules />} />
-            <Route path="/admin/reposicoes" element={<AdminRescheduling />} />
-          </>
-        )}
-        {user?.role === 'teacher' && (
-          <>
-            <Route path="/professor" element={<TeacherDashboard />} />
-            <Route path="/professor/sumarios" element={<TeacherSummaries />} />
-            <Route path="/professor/avaliacoes" element={<TeacherEvaluations />} />
-            <Route path="/professor/documentos" element={<TeacherDocuments />} />
-          </>
-        )}
-        {user?.role === 'student' && (
-          <>
-            <Route path="/aluno" element={<StudentDashboard />} />
-            <Route path="/aluno/calendario" element={<StudentCalendar />} />
-            <Route path="/aluno/sumarios" element={<StudentSummaries />} />
-            <Route path="/aluno/documentos" element={<StudentDocuments />} />
-            <Route path="/aluno/falta" element={<StudentAbsence />} />
-          </>
-        )}
-      </Route>
-      <Route path="*" element={<Navigate to={homeRoute} replace />} />
-    </Routes>
-  );
-}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <AuthProvider>
+      <AppProvider>
         <BrowserRouter>
-          <AppRoutes />
+          <Routes>
+            <Route element={<AppLayout />}>
+              <Route path="/" element={<Navigate to="/admin/aulas" replace />} />
+
+              <Route path="/admin/utilizadores" element={<AdminUtilizadores />} />
+              <Route path="/admin/salas" element={<AdminSalas />} />
+              <Route path="/admin/aulas" element={<AdminAulas />} />
+              <Route path="/admin/reposicoes" element={<AdminReposicoes />} />
+              <Route path="/admin/documentos" element={<AdminDocumentos />} />
+              <Route path="/admin/notificacoes" element={<AdminNotificacoes />} />
+
+              <Route path="/professor/aulas" element={<ProfessorAulas />} />
+              <Route path="/professor/reposicoes" element={<ProfessorReposicoes />} />
+              <Route path="/professor/documentos" element={<ProfessorDocumentos />} />
+
+              <Route path="/aluno/aulas" element={<AlunoAulas />} />
+              <Route path="/aluno/reposicoes" element={<AlunoReposicoes />} />
+              <Route path="/aluno/documentos" element={<AlunoDocumentos />} />
+
+              <Route path="*" element={<NotFound />} />
+            </Route>
+          </Routes>
         </BrowserRouter>
-      </AuthProvider>
+      </AppProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

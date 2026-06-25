@@ -1,20 +1,16 @@
-import { useAuth } from '@/contexts/AuthContext';
-import { useNotifications } from '@/hooks/useSupabaseData';
-import { NavLink } from '@/components/NavLink';
-import { supabase } from '@/integrations/supabase/client';
+import { NavLink, useLocation } from 'react-router-dom';
+import { useApp } from '@/contexts/AppContext';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
   SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem,
   SidebarFooter, useSidebar,
 } from '@/components/ui/sidebar';
-import { Button } from '@/components/ui/button';
 import {
-  LayoutDashboard, Users, DoorOpen, CalendarDays,
-  BookOpen, Star, FileText, Calendar, AlertTriangle,
-  LogOut, Bell, RotateCcw
+  Users, DoorOpen, CalendarDays, RotateCcw, FileText, Bell,
+  BookOpen, FolderOpen,
 } from 'lucide-react';
 import logoGrt from '@/assets/logo-grt.jpg';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Role } from '@/data/mockData';
 
 interface NavItem {
   title: string;
@@ -22,137 +18,94 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
 }
 
-const adminItems: NavItem[] = [
-  { title: 'Painel', url: '/admin', icon: LayoutDashboard },
-  { title: 'Utilizadores', url: '/admin/utilizadores', icon: Users },
-  { title: 'Salas', url: '/admin/salas', icon: DoorOpen },
-  { title: 'Horários', url: '/admin/horarios', icon: CalendarDays },
-  { title: 'Reposições', url: '/admin/reposicoes', icon: RotateCcw },
-];
+const itemsByRole: Record<Role, NavItem[]> = {
+  admin: [
+    { title: 'Utilizadores', url: '/admin/utilizadores', icon: Users },
+    { title: 'Salas', url: '/admin/salas', icon: DoorOpen },
+    { title: 'Aulas', url: '/admin/aulas', icon: CalendarDays },
+    { title: 'Reposições', url: '/admin/reposicoes', icon: RotateCcw },
+    { title: 'Documentos', url: '/admin/documentos', icon: FileText },
+    { title: 'Notificações', url: '/admin/notificacoes', icon: Bell },
+  ],
+  professor: [
+    { title: 'Aulas', url: '/professor/aulas', icon: BookOpen },
+    { title: 'Reposições', url: '/professor/reposicoes', icon: RotateCcw },
+    { title: 'Documentos', url: '/professor/documentos', icon: FolderOpen },
+  ],
+  aluno: [
+    { title: 'Aulas', url: '/aluno/aulas', icon: BookOpen },
+    { title: 'Reposições', url: '/aluno/reposicoes', icon: RotateCcw },
+    { title: 'Documentos', url: '/aluno/documentos', icon: FolderOpen },
+  ],
+};
 
-const teacherItems: NavItem[] = [
-  { title: 'Painel', url: '/professor', icon: LayoutDashboard },
-  { title: 'Sumários', url: '/professor/sumarios', icon: BookOpen },
-  { title: 'Avaliações', url: '/professor/avaliacoes', icon: Star },
-  { title: 'Documentos', url: '/professor/documentos', icon: FileText },
-];
-
-const studentItems: NavItem[] = [
-  { title: 'Painel', url: '/aluno', icon: LayoutDashboard },
-  { title: 'Calendário', url: '/aluno/calendario', icon: Calendar },
-  { title: 'Sumários', url: '/aluno/sumarios', icon: BookOpen },
-  { title: 'Documentos', url: '/aluno/documentos', icon: FileText },
-  { title: 'Avisar Falta', url: '/aluno/falta', icon: AlertTriangle },
-];
+const roleLabel: Record<Role, string> = {
+  admin: 'Administração',
+  professor: 'Professor',
+  aluno: 'Aluno',
+};
 
 export function AppSidebar() {
-  const { user, logout } = useAuth();
-  const { data: notifications, refetch: refetchNotifs } = useNotifications(user?.id);
+  const { currentRole, currentUser, notificacoes } = useApp();
   const { state } = useSidebar();
+  const { pathname } = useLocation();
   const collapsed = state === 'collapsed';
 
-  if (!user) return null;
-
-  const items = user.role === 'admin' ? adminItems : user.role === 'teacher' ? teacherItems : studentItems;
-  const roleLabel = user.role === 'admin' ? 'Administração' : user.role === 'teacher' ? 'Professor' : 'Aluno';
-
-  const unreadCount = notifications.filter(n => !n.read).length;
-
-  const markAllRead = async () => {
-    await (supabase.from('notifications') as any)
-      .update({ read: true })
-      .eq('user_id', user.id)
-      .eq('read', false);
-    refetchNotifs();
-  };
+  const items = itemsByRole[currentRole];
+  const unread = notificacoes.filter(n => !n.lida && n.destinatario_role === currentRole).length;
 
   return (
     <Sidebar collapsible="icon">
       <SidebarContent>
         <SidebarGroup>
           <div className="flex items-center gap-2 px-3 py-4">
-            <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0">
+            <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 bg-white">
               <img src={logoGrt} alt="Logo GRT" className="w-full h-full object-cover" />
             </div>
-            {!collapsed && <span className="font-display font-bold text-sidebar-accent-foreground text-sm">Escola de Música GRT</span>}
+            {!collapsed && (
+              <div className="flex flex-col leading-tight">
+                <span className="font-display font-bold text-sidebar-accent-foreground text-sm">Escola de Música GRT</span>
+                <span className="text-[10px] text-sidebar-muted uppercase tracking-wider">Sistema de gestão</span>
+              </div>
+            )}
           </div>
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>{roleLabel}</SidebarGroupLabel>
+          <SidebarGroupLabel>{roleLabel[currentRole]}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {items.map(item => (
-                <SidebarMenuItem key={item.url}>
-                  <SidebarMenuButton asChild>
-                    <NavLink
-                      to={item.url}
-                      end={item.url === '/admin' || item.url === '/professor' || item.url === '/aluno'}
-                      className="hover:bg-sidebar-accent/50"
-                      activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                    >
-                      <item.icon className="mr-2 h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {items.map(item => {
+                const active = pathname.startsWith(item.url);
+                const showBadge = item.title === 'Notificações' && unread > 0;
+                return (
+                  <SidebarMenuItem key={item.url}>
+                    <SidebarMenuButton asChild isActive={active}>
+                      <NavLink to={item.url} className="flex items-center gap-2">
+                        <item.icon className="h-4 w-4" />
+                        {!collapsed && <span className="flex-1">{item.title}</span>}
+                        {!collapsed && showBadge && (
+                          <span className="ml-auto h-5 min-w-5 px-1 rounded-full bg-status-canceled text-status-canceled-foreground text-[10px] font-bold flex items-center justify-center">
+                            {unread}
+                          </span>
+                        )}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="p-3 space-y-2">
-        <Popover>
-          <PopoverTrigger asChild>
-            <button className="relative flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-sm text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors">
-              <Bell className="w-4 h-4" />
-              {!collapsed && <span>Notificações</span>}
-              {unreadCount > 0 && (
-                <span className="absolute top-0 left-4 w-4 h-4 bg-status-canceled text-status-canceled-foreground text-[10px] font-bold rounded-full flex items-center justify-center">
-                  {unreadCount}
-                </span>
-              )}
-            </button>
-          </PopoverTrigger>
-          <PopoverContent side="right" align="end" className="w-80 p-0">
-            <div className="p-3 border-b flex items-center justify-between">
-              <span className="font-display font-semibold text-sm">Notificações</span>
-              {unreadCount > 0 && (
-                <button onClick={markAllRead} className="text-xs text-muted-foreground hover:text-foreground">
-                  Marcar todas como lidas
-                </button>
-              )}
-            </div>
-            <div className="max-h-60 overflow-y-auto">
-              {notifications.length === 0 ? (
-                <p className="p-4 text-sm text-muted-foreground text-center">Sem notificações</p>
-              ) : (
-                notifications.map(n => (
-                  <div key={n.id} className={`p-3 border-b last:border-0 text-sm ${n.read ? 'opacity-60' : ''}`}>
-                    <p className="text-foreground">{n.message}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {new Date(n.created_at).toLocaleDateString('pt-PT')}
-                    </p>
-                  </div>
-                ))
-              )}
-            </div>
-          </PopoverContent>
-        </Popover>
-
-        <div className="flex items-center gap-2 px-2 text-xs text-sidebar-muted">
-          {!collapsed && <span className="truncate">{user.name}</span>}
-        </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={logout}
-          className="w-full justify-start text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
-        >
-          <LogOut className="w-4 h-4 mr-2" />
-          {!collapsed && 'Sair'}
-        </Button>
+      <SidebarFooter className="p-3">
+        {!collapsed && currentUser && (
+          <div className="px-2 py-1 text-xs text-sidebar-muted">
+            <p className="text-sidebar-accent-foreground font-medium truncate">{currentUser.nome}</p>
+            <p className="truncate">{currentUser.email}</p>
+          </div>
+        )}
       </SidebarFooter>
     </Sidebar>
   );
