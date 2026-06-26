@@ -10,10 +10,10 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatDataHora } from '@/lib/aulaHelpers';
+import { formatDataHora, formatData, formatHora } from '@/lib/aulaHelpers';
 
 export default function ProfessorReposicoes() {
-  const { aulas, setAulas, currentUserId, getSala, salas, setNotificacoes } = useApp();
+  const { aulas, setAulas, currentUserId, getSala, salas, setNotificacoes, getProfile } = useApp();
   const pendentes = aulas.filter(a => a.estado === 'pendente_reposicao' && a.professores.includes(currentUserId));
 
   const [sel, setSel] = useState<Aula | null>(null);
@@ -30,17 +30,50 @@ export default function ProfessorReposicoes() {
     const data_hora = new Date(`${form.data}T${form.hora}:00`).toISOString();
     setAulas(prev => prev.map(a => a.id === sel.id ? { ...a, estado: 'cancelada' } : a));
     const nova: Aula = {
-      id: 'au' + Date.now(), sala_id: form.sala_id, data_hora, duracao: sel.duracao,
-      tipo: 'reposicao', estado: 'agendada',
-      professores: sel.professores, alunos: sel.alunos,
-      aula_original_id: sel.id, data_original: sel.data_hora,
+      id: 'au' + Date.now(),
+      sala_id: form.sala_id,
+      data_hora,
+      duracao: sel.duracao,
+      tipo: 'reposicao',
+      estado: 'agendada',
+      professores: sel.professores,
+      alunos: sel.alunos,
+      aula_original_id: sel.id,
+      data_original: sel.data_hora,
     };
     setAulas(prev => [...prev, nova]);
-    setNotificacoes(prev => [{
-      id: 'n' + Date.now(),
+    
+    // Notificação para administração
+    const adminNotif = {
+      id: 'n-rep-adm-' + Date.now(),
       mensagem: `Reposição marcada para ${formatDataHora(data_hora)}`,
-      lida: false, tipo: 'reposicao_marcada', criado_em: new Date().toISOString(), destinatario_role: 'admin',
-    }, ...prev]);
+      lida: false,
+      tipo: 'reposicao_marcada' as const,
+      criado_em: new Date().toISOString(),
+      destinatario_role: 'admin' as Role,
+    };
+
+    // Notificações para cada aluno da reposição
+    const alunoNotifs = sel.alunos.map((alunoId, idx) => ({
+      id: `n-rep-al-${Date.now()}-${idx}`,
+      mensagem: `Foi marcada uma nova aula de reposição para ${formatDataHora(data_hora)}.`,
+      lida: false,
+      tipo: 'reposicao_marcada' as const,
+      criado_em: new Date().toISOString(),
+      destinatario_role: 'aluno' as Role,
+      aluno_id: alunoId,
+    }));
+
+    setNotificacoes(prev => [adminNotif, ...alunoNotifs, ...prev]);
+
+    // Simulate sending email to each student
+    sel.alunos.forEach(alunoId => {
+      const p = getProfile(alunoId);
+      if (p && p.email) {
+        toast.info(`E-mail enviado para ${p.email}: A aula de ${formatData(sel.data_hora)} às ${formatHora(sel.data_hora)} que foi cancelada foi reposta para ${formatData(data_hora)}, às ${formatHora(data_hora)}`, { duration: 8000 });
+      }
+    });
+
     toast.success('Reposição marcada');
     setSel(null);
   };

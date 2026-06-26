@@ -13,14 +13,14 @@ import { toast } from 'sonner';
 export default function Salas() {
   const { salas, setSalas } = useApp();
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ nome: '', capacidade: 4 });
+  const [form, setForm] = useState({ nome: '' });
 
   const handleCreate = () => {
     if (!form.nome) return toast.error('Indica o nome da sala');
-    const nova: Sala = { id: 'r' + Date.now(), nome: form.nome, capacidade: form.capacidade };
+    const nova: Sala = { id: 'r' + Date.now(), nome: form.nome };
     setSalas(s => [...s, nova]);
     toast.success('Sala criada');
-    setOpen(false); setForm({ nome: '', capacidade: 4 });
+    setOpen(false); setForm({ nome: '' });
   };
 
   const remove = (id: string) => { setSalas(prev => prev.filter(s => s.id !== id)); toast.success('Sala eliminada'); };
@@ -38,7 +38,6 @@ export default function Salas() {
             <DialogHeader><DialogTitle>Criar Sala</DialogTitle></DialogHeader>
             <div className="space-y-3">
               <div><Label>Nome</Label><Input value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} /></div>
-              <div><Label>Capacidade</Label><Input type="number" value={form.capacidade} onChange={e => setForm({ ...form, capacidade: +e.target.value })} /></div>
             </div>
             <DialogFooter><Button onClick={handleCreate}>Guardar</Button></DialogFooter>
           </DialogContent>
@@ -48,13 +47,12 @@ export default function Salas() {
       <Card>
         <Table>
           <TableHeader>
-            <TableRow><TableHead>Sala</TableHead><TableHead>Capacidade</TableHead><TableHead className="text-right">Ações</TableHead></TableRow>
+            <TableRow><TableHead>Sala</TableHead><TableHead className="text-right">Ações</TableHead></TableRow>
           </TableHeader>
           <TableBody>
             {salas.map(s => (
               <TableRow key={s.id}>
                 <TableCell className="font-medium">{s.nome}</TableCell>
-                <TableCell>{s.capacidade} alunos</TableCell>
                 <TableCell className="text-right">
                   <Button size="sm" variant="ghost" onClick={() => remove(s.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
                 </TableCell>

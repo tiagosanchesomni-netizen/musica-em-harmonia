@@ -9,34 +9,91 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Key, Trash2 } from 'lucide-react';
+import { Plus, Key, Trash2, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 
-export default function Utilizadores() {
-  const { profiles, setProfiles } = useApp();
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ nome: '', email: '', role: 'aluno' as Role });
+import { supabase } from '@/integrations/supabase/client';
 
-  const handleCreate = () => {
-    if (!form.nome || !form.email) return toast.error('Preenche todos os campos');
+export default function Utilizadores() {
+  const { profiles, setProfiles, currentUserId } = useApp();
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ nome: '', role: 'aluno' as Role });
+  const [creating, setCreating] = useState(false);
+
+  const handleCreate = async () => {
+    if (!form.nome) return toast.error('Preencha o nome do utilizador');
+    
+    setCreating(true);
     const chave = Math.random().toString(36).slice(2, 8).toUpperCase();
-    const novo: Profile = {
-      id: 'u' + Date.now(),
-      nome: form.nome, email: form.email, role: form.role, primeiro_acesso: true,
-    };
-    setProfiles(p => [...p, novo]);
-    toast.success(`Utilizador criado. Chave provisória: ${chave}`);
-    setOpen(false);
-    setForm({ nome: '', email: '', role: 'aluno' });
+    const tempEmail = `temp_${Date.now()}@grt.pt`;
+
+    try {
+      // Call Supabase Edge Function to create the auth user
+      const { data, error } = await supabase.functions.invoke('admin-create-user', {
+        body: {
+          email: tempEmail,
+          password: chave,
+          name: form.nome,
+          role: form.role === 'aluno' ? 'student' : form.role === 'professor' ? 'teacher' : 'admin',
+        }
+      });
+
+      if (error || (data && data.error)) {
+        throw new Error(error?.message || data?.error || 'Erro ao criar utilizador');
+      }
+
+      const novo: Profile = {
+        id: data.user_id, // Match ID to UUID from auth.users
+        nome: form.nome,
+        email: tempEmail,
+        role: form.role,
+        primeiro_acesso: true,
+        chave_provisoria: chave,
+      };
+
+      await setProfiles(p => [...p, novo]);
+      toast.success(`Utilizador criado. Chave provisória: ${chave}`);
+      setOpen(false);
+      setForm({ nome: '', role: 'aluno' });
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao criar utilizador');
+    } finally {
+      setCreating(false);
+    }
   };
 
-  const resetPassword = (p: Profile) => {
+  const resetPassword = async (p: Profile) => {
+    if (p.role === 'admin') return toast.error('Não é possível repor a chave de um administrador');
     const chave = Math.random().toString(36).slice(2, 8).toUpperCase();
-    setProfiles(prev => prev.map(x => x.id === p.id ? { ...x, primeiro_acesso: true } : x));
-    toast.success(`Nova chave provisória para ${p.nome}: ${chave}`);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-reset-password', {
+        body: {
+          user_id: p.id,
+          new_password: chave,
+        }
+      });
+
+      if (error || (data && data.error)) {
+        throw new Error(error?.message || data?.error || 'Erro ao repor chave');
+      }
+
+      await setProfiles(prev => prev.map(x => x.id === p.id ? { ...x, primeiro_acesso: true, chave_provisoria: chave } : x));
+      toast.success(`Nova chave provisória para ${p.nome}: ${chave}`);
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao repor chave');
+    }
+  };
+
+  const showProvisionalKey = (p: Profile) => {
+    const key = p.chave_provisoria || 'Não definida';
+    navigator.clipboard.writeText(key);
+    toast.info(`Chave provisória de ${p.nome}: ${key} (Copiada)`);
   };
 
   const remove = (id: string) => {
+    const target = profiles.find(p => p.id === id);
+    if (target?.role === 'admin') return toast.error('Não é possível eliminar um administrador');
     setProfiles(prev => prev.filter(p => p.id !== id));
     toast.success('Utilizador eliminado');
   };
@@ -58,7 +115,6 @@ export default function Utilizadores() {
             <DialogHeader><DialogTitle>Criar Utilizador</DialogTitle></DialogHeader>
             <div className="space-y-3">
               <div><Label>Nome</Label><Input value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} /></div>
-              <div><Label>Email</Label><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
               <div><Label>Perfil</Label>
                 <Select value={form.role} onValueChange={(v) => setForm({ ...form, role: v as Role })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -71,7 +127,11 @@ export default function Utilizadores() {
               </div>
               <p className="text-xs text-muted-foreground">Será gerada uma chave provisória que o utilizador usa no primeiro acesso.</p>
             </div>
-            <DialogFooter><Button onClick={handleCreate}>Criar</Button></DialogFooter>
+            <DialogFooter>
+              <Button onClick={handleCreate} disabled={creating}>
+                {creating ? 'A criar...' : 'Criar'}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
@@ -91,7 +151,7 @@ export default function Utilizadores() {
             {profiles.map(p => (
               <TableRow key={p.id}>
                 <TableCell className="font-medium">{p.nome}</TableCell>
-                <TableCell>{p.email}</TableCell>
+                <TableCell>{p.email || <span className="text-muted-foreground italic">Não associado</span>}</TableCell>
                 <TableCell><Badge variant="secondary">{roleLabel[p.role]}</Badge></TableCell>
                 <TableCell>
                   {p.primeiro_acesso
@@ -99,6 +159,11 @@ export default function Utilizadores() {
                     : <Badge className="bg-status-taught text-status-taught-foreground">Ativo</Badge>}
                 </TableCell>
                 <TableCell className="text-right space-x-1">
+                  {p.primeiro_acesso && (
+                    <Button size="sm" variant="ghost" onClick={() => showProvisionalKey(p)} className="text-primary hover:text-primary">
+                      <Eye className="w-4 h-4 mr-1" />Mostrar chave
+                    </Button>
+                  )}
                   <Button size="sm" variant="ghost" onClick={() => resetPassword(p)}><Key className="w-4 h-4 mr-1" />Repor chave</Button>
                   <Button size="sm" variant="ghost" onClick={() => remove(p.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
                 </TableCell>

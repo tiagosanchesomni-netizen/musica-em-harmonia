@@ -7,8 +7,9 @@ import {
 } from '@/components/ui/sidebar';
 import {
   Users, DoorOpen, CalendarDays, RotateCcw, FileText, Bell,
-  BookOpen, FolderOpen,
+  BookOpen, FolderOpen, LogOut,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import logoGrt from '@/assets/logo-grt.jpg';
 import { Role } from '@/data/mockData';
 
@@ -36,6 +37,7 @@ const itemsByRole: Record<Role, NavItem[]> = {
     { title: 'Aulas', url: '/aluno/aulas', icon: BookOpen },
     { title: 'Reposições', url: '/aluno/reposicoes', icon: RotateCcw },
     { title: 'Documentos', url: '/aluno/documentos', icon: FolderOpen },
+    { title: 'Notificações', url: '/aluno/notificacoes', icon: Bell },
   ],
 };
 
@@ -46,13 +48,17 @@ const roleLabel: Record<Role, string> = {
 };
 
 export function AppSidebar() {
-  const { currentRole, currentUser, notificacoes } = useApp();
+  const { currentRole, currentUser, currentUserId, notificacoes, logout } = useApp();
   const { state } = useSidebar();
   const { pathname } = useLocation();
   const collapsed = state === 'collapsed';
 
   const items = itemsByRole[currentRole];
-  const unread = notificacoes.filter(n => !n.lida && n.destinatario_role === currentRole).length;
+  const unread = notificacoes.filter(n => 
+    !n.lida && 
+    n.destinatario_role === currentRole && 
+    (currentRole !== 'aluno' || n.aluno_id === currentUserId)
+  ).length;
 
   return (
     <Sidebar collapsible="icon">
@@ -99,13 +105,22 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="p-3">
+      <SidebarFooter className="p-2 space-y-1">
         {!collapsed && currentUser && (
           <div className="px-2 py-1 text-xs text-sidebar-muted">
             <p className="text-sidebar-accent-foreground font-medium truncate">{currentUser.nome}</p>
-            <p className="truncate">{currentUser.email}</p>
+            <p className="truncate text-[10px] opacity-75">{currentUser.email}</p>
           </div>
         )}
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={logout} 
+          className="w-full justify-start text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+        >
+          <LogOut className="h-4 w-4 mr-2" />
+          {!collapsed && <span>Sair</span>}
+        </Button>
       </SidebarFooter>
     </Sidebar>
   );

@@ -20,7 +20,9 @@ import ProfessorDocumentos from "@/pages/professor/Documentos";
 import AlunoAulas from "@/pages/aluno/Aulas";
 import AlunoReposicoes from "@/pages/aluno/Reposicoes";
 import AlunoDocumentos from "@/pages/aluno/Documentos";
+import AlunoNotificacoes from "@/pages/aluno/Notificacoes";
 
+import Login from "@/pages/Login";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -33,6 +35,7 @@ const App = () => (
       <AppProvider>
         <BrowserRouter>
           <Routes>
+            <Route path="/login" element={<Login />} />
             <Route element={<AppLayout />}>
               <Route path="/" element={<Navigate to="/admin/aulas" replace />} />
 
@@ -50,6 +53,7 @@ const App = () => (
               <Route path="/aluno/aulas" element={<AlunoAulas />} />
               <Route path="/aluno/reposicoes" element={<AlunoReposicoes />} />
               <Route path="/aluno/documentos" element={<AlunoDocumentos />} />
+              <Route path="/aluno/notificacoes" element={<AlunoNotificacoes />} />
 
               <Route path="*" element={<NotFound />} />
             </Route>

@@ -11,10 +11,10 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Pencil } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatDataHora } from '@/lib/aulaHelpers';
+import { formatDataHora, formatData, formatHora } from '@/lib/aulaHelpers';
 
 export default function AdminReposicoes() {
-  const { aulas, setAulas, salas, getSala, getProfile } = useApp();
+  const { aulas, setAulas, salas, getSala, getProfile, setNotificacoes } = useApp();
   const pendentes = aulas.filter(a => a.estado === 'pendente_reposicao');
   const repostas = aulas.filter(a => a.tipo === 'reposicao');
 
@@ -42,6 +42,27 @@ export default function AdminReposicoes() {
       aula_original_id: editing.id, data_original: editing.data_hora,
     };
     setAulas(prev => [...prev, nova]);
+
+    // Criar notificações para cada aluno inscrito na reposição
+    const alunoNotifs = editing.alunos.map((alunoId, idx) => ({
+      id: `n-rep-adm-${Date.now()}-${idx}`,
+      mensagem: `Foi marcada uma nova aula de reposição para ${formatDataHora(data_hora)}.`,
+      lida: false,
+      tipo: 'reposicao_marcada' as const,
+      criado_em: new Date().toISOString(),
+      destinatario_role: 'aluno' as Role,
+      aluno_id: alunoId,
+    }));
+    setNotificacoes(prev => [...alunoNotifs, ...prev]);
+
+    // Simulate sending email to each student
+    editing.alunos.forEach(alunoId => {
+      const p = getProfile(alunoId);
+      if (p && p.email) {
+        toast.info(`E-mail enviado para ${p.email}: A aula de ${formatData(editing.data_hora)} às ${formatHora(editing.data_hora)} que foi cancelada foi reposta para ${formatData(data_hora)}, às ${formatHora(data_hora)}`, { duration: 8000 });
+      }
+    });
+
     toast.success('Reposição marcada');
     setEditing(null);
   };

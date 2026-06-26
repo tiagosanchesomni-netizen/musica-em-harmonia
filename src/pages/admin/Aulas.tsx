@@ -12,10 +12,10 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Pencil, CalendarDays } from 'lucide-react';
 import { toast } from 'sonner';
-import { estadoConfig, formatDataHora } from '@/lib/aulaHelpers';
+import { estadoConfig, formatDataHora, formatData, formatHora } from '@/lib/aulaHelpers';
 
 export default function AdminAulas() {
-  const { aulas, setAulas, salas, profiles, getSala, getProfile, assiduidades, setAssiduidades } = useApp();
+  const { aulas, setAulas, salas, profiles, getSala, getProfile, assiduidades, setAssiduidades, setNotificacoes } = useApp();
   const professores = profiles.filter(p => p.role === 'professor');
   const alunos = profiles.filter(p => p.role === 'aluno');
 
@@ -23,12 +23,20 @@ export default function AdminAulas() {
   const [editing, setEditing] = useState<Aula | null>(null);
   const [form, setForm] = useState<{
     sala_id: string; data: string; hora: string; duracao: number;
-    professores: string[]; alunos: string[];
-  }>({ sala_id: '', data: '', hora: '10:00', duracao: 60, professores: [], alunos: [] });
+    professores: string[]; alunos: string[]; semanal: boolean;
+  }>({ sala_id: '', data: '', hora: '10:00', duracao: 60, professores: [], alunos: [], semanal: false });
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ sala_id: salas[0]?.id || '', data: new Date().toISOString().slice(0, 10), hora: '10:00', duracao: 60, professores: [], alunos: [] });
+    setForm({ 
+      sala_id: salas[0]?.id || '', 
+      data: new Date().toISOString().slice(0, 10), 
+      hora: '10:00', 
+      duracao: 60, 
+      professores: [], 
+      alunos: [],
+      semanal: false 
+    });
     setOpen(true);
   };
 
@@ -41,17 +49,145 @@ export default function AdminAulas() {
     if (form.professores.length === 0) return toast.error('Adiciona pelo menos um professor');
     if (form.alunos.length === 0) return toast.error('Adiciona pelo menos um aluno');
     const data_hora = new Date(`${form.data}T${form.hora}:00`).toISOString();
+    
     if (editing) {
-      setAulas(prev => prev.map(a => a.id === editing.id ? { ...a, sala_id: form.sala_id, data_hora, duracao: form.duracao, professores: form.professores, alunos: form.alunos } : a));
+      const originalAlunos = editing.alunos;
+      const newAlunos = form.alunos;
+      const added = newAlunos.filter(x => !originalAlunos.includes(x));
+      const removed = originalAlunos.filter(x => !newAlunos.includes(x));
+
+      setAulas(prev => prev.map(a => {
+        // Se for a aula que está a ser editada, atualiza todos os campos
+        if (a.id === editing.id) {
+          return { 
+            ...a, 
+            sala_id: form.sala_id, 
+            data_hora, 
+            duracao: form.duracao, 
+            professores: form.professores, 
+            alunos: form.alunos 
+          };
+        }
+        // Se pertencer ao mesmo grupo de repetição semanal e for uma aula futura
+        if (a.grupo_id && a.grupo_id === editing.grupo_id && new Date(a.data_hora).getTime() > new Date(editing.data_hora).getTime()) {
+          const updatedAlunos = [
+            ...a.alunos.filter(alId => !removed.includes(alId)),
+            ...added.filter(alId => !a.alunos.includes(alId))
+          ];
+          return {
+            ...a,
+            professores: form.professores, // mantém professores em sincronia
+            alunos: updatedAlunos
+          };
+        }
+        return a;
+      }));
       toast.success('Aula atualizada');
     } else {
-      const nova: Aula = {
-        id: 'au' + Date.now(), sala_id: form.sala_id, data_hora, duracao: form.duracao,
-        tipo: 'normal', estado: 'agendada', professores: form.professores, alunos: form.alunos,
-      };
-      setAulas(prev => [...prev, nova]);
-      toast.success('Aula criada');
+      if (form.semanal) {
+        const grupoId = 'g-' + Date.now();
+        const novasAulas: Aula[] = [];
+        
+        for (let i = 0; i < 4; i++) {
+          const dataObj = new Date(`${form.data}T${form.hora}:00`);
+          dataObj.setDate(dataObj.getDate() + (i * 7));
+          
+          novasAulas.push({
+            id: 'au-' + Date.now() + '-' + i,
+            sala_id: form.sala_id,
+            data_hora: dataObj.toISOString(),
+            duracao: form.duracao,
+            tipo: 'normal',
+            estado: 'agendada',
+            professores: form.professores,
+            alunos: form.alunos,
+            grupo_id: grupoId
+          });
+        }
+        
+        setAulas(prev => [...prev, ...novasAulas]);
+        toast.success('Série de 4 aulas semanais criada com sucesso');
+      } else {
+        const nova: Aula = {
+          id: 'au' + Date.now(), 
+          sala_id: form.sala_id, 
+          data_hora, 
+          duracao: form.duracao,
+          tipo: 'normal', 
+          estado: 'agendada', 
+          professores: form.professores, 
+          alunos: form.alunos,
+        };
+        setAulas(prev => [...prev, nova]);
+        toast.success('Aula criada');
+      }
     }
+    setOpen(false);
+  };
+
+  const handleStopWeekly = () => {
+    if (!editing || !editing.grupo_id) return;
+    
+    setAulas(prev => {
+      // 1. Elimina todas as aulas futuras do mesmo grupo
+      const cleanAulas = prev.filter(a => {
+        if (a.grupo_id === editing.grupo_id && new Date(a.data_hora).getTime() > new Date(editing.data_hora).getTime()) {
+          return false;
+        }
+        return true;
+      });
+
+      // 2. Remove o grupo_id da aula editada atual, tornando-a avulsa/não recorrente
+      return cleanAulas.map(a => {
+        if (a.id === editing.id) {
+          const { grupo_id, ...rest } = a;
+          return rest as Aula;
+        }
+        return a;
+      });
+    });
+
+    toast.success('Aula semanal interrompida. Aulas futuras eliminadas.');
+    setOpen(false);
+  };
+
+  const handleCancelClass = () => {
+    if (!editing) return;
+    
+    setAulas(prev => prev.map(a => a.id === editing.id ? { ...a, estado: 'pendente_reposicao' } : a));
+    
+    const professorNames = editing.professores.map(pId => getProfile(pId)?.nome || '').join(', ');
+
+    const adminNotif = {
+      id: 'n-adm-canc-' + Date.now(),
+      mensagem: `Aula de ${formatDataHora(editing.data_hora)} (Prof. ${professorNames}) foi cancelada e precisa de reposição`,
+      lida: false,
+      tipo: 'cancelamento' as const,
+      criado_em: new Date().toISOString(),
+      destinatario_role: 'admin' as const,
+    };
+
+    const alunoNotifs = editing.alunos.map((alunoId, idx) => ({
+      id: `n-al-canc-${Date.now()}-${idx}`,
+      mensagem: `A sua aula de ${formatDataHora(editing.data_hora)} com o(a) Prof. ${professorNames} foi cancelada.`,
+      lida: false,
+      tipo: 'cancelamento' as const,
+      criado_em: new Date().toISOString(),
+      destinatario_role: 'aluno' as const,
+      aluno_id: alunoId,
+    }));
+
+    setNotificacoes(prev => [adminNotif, ...alunoNotifs, ...prev]);
+
+    // Simulate sending email to each student
+    editing.alunos.forEach(alunoId => {
+      const p = getProfile(alunoId);
+      if (p && p.email) {
+        toast.info(`E-mail enviado para ${p.email}: A aula no dia ${formatData(editing.data_hora)} na hora ${formatHora(editing.data_hora)} foi cancelada pelo professor.`, { duration: 6000 });
+      }
+    });
+
+    toast.success('Aula cancelada e enviada para reposições');
     setOpen(false);
   };
 
@@ -74,6 +210,7 @@ export default function AdminAulas() {
       duracao: aula.duracao,
       professores: aula.professores,
       alunos: aula.alunos,
+      semanal: !!aula.grupo_id,
     });
     setOpen(true);
   };
@@ -127,6 +264,7 @@ export default function AdminAulas() {
                   <TableCell>
                     <Badge className={cfg.className}>{cfg.label}</Badge>
                     {a.tipo === 'reposicao' && <Badge variant="outline" className="ml-1">Reposição</Badge>}
+                    {a.grupo_id && <Badge variant="outline" className="ml-1 bg-primary/10 text-primary border-primary/20">Semanal</Badge>}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button size="sm" variant="ghost" onClick={() => startEdit(a)}><Pencil className="w-4 h-4" /></Button>
@@ -152,6 +290,20 @@ export default function AdminAulas() {
             <div><Label>Data</Label><Input type="date" value={form.data} onChange={e => setForm({ ...form, data: e.target.value })} /></div>
             <div><Label>Hora</Label><Input type="time" value={form.hora} onChange={e => setForm({ ...form, hora: e.target.value })} /></div>
           </div>
+
+          {!editing && (
+            <div className="flex items-center space-x-2 mt-2 bg-muted/40 p-2.5 rounded-md border">
+              <Checkbox 
+                id="semanal" 
+                checked={form.semanal} 
+                onCheckedChange={v => setForm({ ...form, semanal: !!v })} 
+              />
+              <Label htmlFor="semanal" className="cursor-pointer text-sm font-medium">
+                Repetição semanal
+              </Label>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3 mt-2">
             <div>
               <Label className="mb-2 block">Professores</Label>
@@ -176,7 +328,23 @@ export default function AdminAulas() {
               </div>
             </div>
           </div>
-          <DialogFooter><Button onClick={handleSave}><CalendarDays className="w-4 h-4 mr-2" />Guardar</Button></DialogFooter>
+          <DialogFooter className="flex items-center justify-between gap-2">
+            <div className="flex gap-2">
+              {editing && editing.estado === 'agendada' && (
+                <Button type="button" variant="destructive" onClick={handleCancelClass}>
+                  Cancelar esta aula
+                </Button>
+              )}
+              {editing?.grupo_id && (
+                <Button type="button" variant="destructive" onClick={handleStopWeekly}>
+                  Parar Aula Semanal
+                </Button>
+              )}
+            </div>
+            <Button onClick={handleSave} className="ml-auto">
+              <CalendarDays className="w-4 h-4 mr-2" />Guardar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

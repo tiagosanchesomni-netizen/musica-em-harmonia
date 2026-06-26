@@ -9,12 +9,13 @@ export interface Profile {
   email: string;
   role: Role;
   primeiro_acesso: boolean;
+  chave_provisoria?: string;
 }
 
 export interface Sala {
   id: string;
   nome: string;
-  capacidade: number;
+  capacidade?: number;
 }
 
 export type EstadoAula = 'agendada' | 'realizada' | 'cancelada' | 'pendente_reposicao';
@@ -32,6 +33,7 @@ export interface Aula {
   aula_original_id?: string; // se for reposição
   data_original?: string;
   presencas_finalizadas?: boolean;
+  grupo_id?: string; // identificador da série semanal
 }
 
 export interface Assiduidade {
@@ -70,6 +72,7 @@ export interface Notificacao {
   tipo: TipoNotificacao;
   criado_em: string;
   destinatario_role: Role;
+  aluno_id?: string;
 }
 
 // ─── helpers ──────────────────────────────────────────────────────────────
@@ -88,11 +91,11 @@ export const seedProfiles: Profile[] = [
   { id: 'a1', nome: 'Tiago Sanches', email: '1999tiagosanches@gmail.com', role: 'admin', primeiro_acesso: false },
   { id: 'p1', nome: 'Prof. Maria Costa', email: 'maria@grt.pt', role: 'professor', primeiro_acesso: false },
   { id: 'p2', nome: 'Prof. João Pereira', email: 'joao@grt.pt', role: 'professor', primeiro_acesso: false },
-  { id: 'p3', nome: 'Prof. Ana Ribeiro', email: 'ana@grt.pt', role: 'professor', primeiro_acesso: true },
+  { id: 'p3', nome: 'Prof. Ana Ribeiro', email: 'ana@grt.pt', role: 'professor', primeiro_acesso: true, chave_provisoria: 'ANA123' },
   { id: 's1', nome: 'Beatriz Lopes', email: 'beatriz@aluno.pt', role: 'aluno', primeiro_acesso: false },
   { id: 's2', nome: 'Diogo Martins', email: 'diogo@aluno.pt', role: 'aluno', primeiro_acesso: false },
   { id: 's3', nome: 'Inês Faria', email: 'ines@aluno.pt', role: 'aluno', primeiro_acesso: false },
-  { id: 's4', nome: 'Rui Almeida', email: 'rui@aluno.pt', role: 'aluno', primeiro_acesso: true },
+  { id: 's4', nome: 'Rui Almeida', email: 'rui@aluno.pt', role: 'aluno', primeiro_acesso: true, chave_provisoria: 'RUI123' },
   { id: 's5', nome: 'Sofia Mendes', email: 'sofia@aluno.pt', role: 'aluno', primeiro_acesso: false },
 ];
 
@@ -177,4 +180,6 @@ export const seedDocumentos: Documento[] = [
 export const seedNotificacoes: Notificacao[] = [
   { id: 'n1', mensagem: 'Prof. João Pereira cancelou a aula de 15:00', lida: false, tipo: 'cancelamento', criado_em: offsetDate(-1), destinatario_role: 'admin' },
   { id: 'n2', mensagem: 'Aula de 14:00 (Prof. João) sem presenças finalizadas há 2 dias', lida: false, tipo: 'atraso_presenca', criado_em: offsetDate(0), destinatario_role: 'admin' },
+  { id: 'n3', mensagem: 'A sua aula de Piano com a Prof. Maria Costa foi cancelada.', lida: false, tipo: 'cancelamento', criado_em: offsetDate(-1), destinatario_role: 'aluno', aluno_id: 's1' },
+  { id: 'n4', mensagem: 'Foi marcada uma nova aula de reposição para amanhã às 14:30.', lida: false, tipo: 'reposicao_marcada', criado_em: offsetDate(0), destinatario_role: 'aluno', aluno_id: 's1' },
 ];
