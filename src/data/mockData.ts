@@ -161,14 +161,16 @@ export const seedAssiduidades: Assiduidade[] = [
 ];
 
 export const seedPastas: Pasta[] = [
-  { id: 'f1', nome: 'Partituras Piano', criado_por: 'p1' },
-  { id: 'f2', nome: 'Exercícios Teoria', criado_por: 'p2' },
+  { id: 'f1', nome: 'Partituras Piano', criado_por: 'p1', acesso_alunos: ['s1', 's5'] },
+  { id: 'f2', nome: 'Exercícios Teoria', criado_por: 'p2', acesso_alunos: 'all' },
+  { id: 'f3', nome: 'Material Geral', criado_por: 'a1', acesso_alunos: 'all' },
 ];
 
 export const seedDocumentos: Documento[] = [
-  { id: 'd1', nome: 'Sonata em Dó.pdf', url: '#', pasta_id: 'f1', aula_id: 'au3', criado_por: 'p1', criado_em: offsetDate(-1) },
-  { id: 'd2', nome: 'Escalas Maiores.pdf', url: '#', pasta_id: 'f2', criado_por: 'p2', criado_em: offsetDate(-3) },
-  { id: 'd3', nome: 'Resumo aula 12.docx', url: '#', aula_id: 'au1', criado_por: 'p1', criado_em: offsetDate(-2) },
+  { id: 'd1', nome: 'Sonata em Dó.pdf', url: '#', pasta_id: 'f1', criado_por: 'p1', criado_em: offsetDate(-1), acesso_alunos: ['s1'] },
+  { id: 'd2', nome: 'Escalas Maiores.pdf', url: '#', pasta_id: 'f2', criado_por: 'p2', criado_em: offsetDate(-3), acesso_alunos: 'all' },
+  { id: 'd3', nome: 'Resumo aula 12.docx', url: '#', criado_por: 'p1', criado_em: offsetDate(-2), acesso_alunos: ['s1', 's2'] },
+  { id: 'd4', nome: 'Regulamento Interno.pdf', url: '#', pasta_id: 'f3', criado_por: 'a1', criado_em: offsetDate(-5), acesso_alunos: 'all' },
 ];
 
 export const seedNotificacoes: Notificacao[] = [
