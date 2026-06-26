@@ -55,6 +55,7 @@ export interface Documento {
   nome: string;
   url: string;
   pasta_id?: string;
+  aula_id?: string;
   criado_por: string;
   criado_em: string;
   acesso_alunos: AcessoAlunos;
