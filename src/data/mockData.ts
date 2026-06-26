@@ -41,20 +41,23 @@ export interface Assiduidade {
   presente: boolean;
 }
 
+export type AcessoAlunos = 'all' | string[];
+
 export interface Pasta {
   id: string;
   nome: string;
   criado_por: string;
+  acesso_alunos: AcessoAlunos;
 }
 
 export interface Documento {
   id: string;
   nome: string;
   url: string;
-  aula_id?: string;
   pasta_id?: string;
   criado_por: string;
   criado_em: string;
+  acesso_alunos: AcessoAlunos;
 }
 
 export type TipoNotificacao = 'cancelamento' | 'atraso_presenca' | 'reposicao_marcada';
