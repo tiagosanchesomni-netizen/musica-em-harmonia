@@ -46,9 +46,10 @@ export default function ProfessorAulas() {
     const novo: Documento = {
       id: 'd' + Date.now(), nome: f.name, url: '#',
       aula_id: selected.id, criado_por: currentUserId, criado_em: new Date().toISOString(),
+      acesso_alunos: [...selected.alunos],
     };
     setDocumentos(prev => [novo, ...prev]);
-    toast.success('Documento associado à aula');
+    toast.success('Documento associado à aula (acesso para alunos inscritos)');
     e.target.value = '';
   };
 
