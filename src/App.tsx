@@ -22,6 +22,8 @@ import AlunoReposicoes from "@/pages/aluno/Reposicoes";
 import AlunoDocumentos from "@/pages/aluno/Documentos";
 import AlunoNotificacoes from "@/pages/aluno/Notificacoes";
 
+import Estatisticas from "@/pages/Estatisticas";
+
 import Login from "@/pages/Login";
 import NotFound from "@/pages/NotFound";
 
@@ -45,15 +47,18 @@ const App = () => (
               <Route path="/admin/reposicoes" element={<AdminReposicoes />} />
               <Route path="/admin/documentos" element={<AdminDocumentos />} />
               <Route path="/admin/notificacoes" element={<AdminNotificacoes />} />
+              <Route path="/admin/estatisticas" element={<Estatisticas />} />
 
               <Route path="/professor/aulas" element={<ProfessorAulas />} />
               <Route path="/professor/reposicoes" element={<ProfessorReposicoes />} />
               <Route path="/professor/documentos" element={<ProfessorDocumentos />} />
+              <Route path="/professor/estatisticas" element={<Estatisticas />} />
 
               <Route path="/aluno/aulas" element={<AlunoAulas />} />
               <Route path="/aluno/reposicoes" element={<AlunoReposicoes />} />
               <Route path="/aluno/documentos" element={<AlunoDocumentos />} />
               <Route path="/aluno/notificacoes" element={<AlunoNotificacoes />} />
+              <Route path="/aluno/estatisticas" element={<Estatisticas />} />
 
               <Route path="*" element={<NotFound />} />
             </Route>

@@ -7,7 +7,7 @@ import {
 } from '@/components/ui/sidebar';
 import {
   Users, DoorOpen, CalendarDays, RotateCcw, FileText, Bell,
-  BookOpen, FolderOpen, LogOut,
+  BookOpen, FolderOpen, LogOut, BarChart3,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import logoGrt from '@/assets/logo-grt.jpg';
@@ -26,17 +26,20 @@ const itemsByRole: Record<Role, NavItem[]> = {
     { title: 'Aulas', url: '/admin/aulas', icon: CalendarDays },
     { title: 'Reposições', url: '/admin/reposicoes', icon: RotateCcw },
     { title: 'Documentos', url: '/admin/documentos', icon: FileText },
+    { title: 'Estatísticas', url: '/admin/estatisticas', icon: BarChart3 },
     { title: 'Notificações', url: '/admin/notificacoes', icon: Bell },
   ],
   professor: [
     { title: 'Aulas', url: '/professor/aulas', icon: BookOpen },
     { title: 'Reposições', url: '/professor/reposicoes', icon: RotateCcw },
     { title: 'Documentos', url: '/professor/documentos', icon: FolderOpen },
+    { title: 'Estatísticas', url: '/professor/estatisticas', icon: BarChart3 },
   ],
   aluno: [
     { title: 'Aulas', url: '/aluno/aulas', icon: BookOpen },
     { title: 'Reposições', url: '/aluno/reposicoes', icon: RotateCcw },
     { title: 'Documentos', url: '/aluno/documentos', icon: FolderOpen },
+    { title: 'Estatísticas', url: '/aluno/estatisticas', icon: BarChart3 },
     { title: 'Notificações', url: '/aluno/notificacoes', icon: Bell },
   ],
 };

@@ -2,7 +2,7 @@ import { useApp } from '@/contexts/AppContext';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Bell, X, Check, Calendar } from 'lucide-react';
+import { Bell, X, Check, Calendar, Trash2 } from 'lucide-react';
 import { formatDataHora } from '@/lib/aulaHelpers';
 
 export default function AlunoNotificacoes() {
@@ -19,6 +19,10 @@ export default function AlunoNotificacoes() {
   const markAll = () => setNotificacoes(prev => prev.map(n => 
     n.destinatario_role === 'aluno' && n.aluno_id === currentUserId ? { ...n, lida: true } : n
   ));
+  const deleteOne = (id: string) => setNotificacoes(prev => prev.filter(n => n.id !== id));
+  const deleteAll = () => setNotificacoes(prev => prev.filter(n => 
+    !(n.destinatario_role === 'aluno' && n.aluno_id === currentUserId)
+  ));
 
   return (
     <div className="space-y-6">
@@ -27,10 +31,17 @@ export default function AlunoNotificacoes() {
           <h1 className="text-2xl font-bold">Notificações</h1>
           <p className="text-sm text-muted-foreground">Alertas de cancelamento de aulas e marcação de reposições.</p>
         </div>
-        {lista.some(n => !n.lida) && (
-          <Button variant="outline" size="sm" onClick={markAll}>
-            <Check className="w-4 h-4 mr-2" /> Marcar todas como lidas
-          </Button>
+        {lista.length > 0 && (
+          <div className="flex gap-2">
+            {lista.some(n => !n.lida) && (
+              <Button variant="outline" size="sm" onClick={markAll}>
+                <Check className="w-4 h-4 mr-2" /> Marcar todas como lidas
+              </Button>
+            )}
+            <Button variant="destructive" size="sm" onClick={deleteAll}>
+              <Trash2 className="w-4 h-4 mr-2" /> Apagar todas
+            </Button>
+          </div>
         )}
       </div>
 
@@ -53,11 +64,16 @@ export default function AlunoNotificacoes() {
               <p className="mt-1 text-sm text-foreground">{n.mensagem}</p>
               <p className="text-xs text-muted-foreground mt-1">{formatDataHora(n.criado_em)}</p>
             </div>
-            {!n.lida && (
-              <Button size="sm" variant="ghost" onClick={() => markRead(n.id)} className="shrink-0">
-                <Check className="w-4 h-4" />
+            <div className="flex items-center gap-1 shrink-0">
+              {!n.lida && (
+                <Button size="sm" variant="ghost" title="Marcar como lida" onClick={() => markRead(n.id)}>
+                  <Check className="w-4 h-4" />
+                </Button>
+              )}
+              <Button size="sm" variant="ghost" title="Apagar" onClick={() => deleteOne(n.id)} className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                <X className="w-4 h-4" />
               </Button>
-            )}
+            </div>
           </Card>
         ))}
       </div>
