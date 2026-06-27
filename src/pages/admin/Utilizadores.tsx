@@ -223,11 +223,11 @@ export default function Utilizadores() {
                   {p.role !== 'admin' && (
                     p.suspenso ? (
                       <Button size="sm" variant="ghost" onClick={() => handleReativar(p.id)} className="text-green-600 hover:text-green-700">
-                        <Play className="w-4 h-4 mr-1" />Retomar
+                        <Play className="w-4 h-4 mr-1" />Retomar atividade
                       </Button>
                     ) : (
                       <Button size="sm" variant="ghost" onClick={() => handleSuspender(p.id)} className="text-amber-600 hover:text-amber-700">
-                        <Pause className="w-4 h-4 mr-1" />Suspender
+                        <Pause className="w-4 h-4 mr-1" />Fora temporariamente
                       </Button>
                     )
                   )}
