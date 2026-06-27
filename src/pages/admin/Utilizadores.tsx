@@ -90,15 +90,16 @@ export default function Utilizadores() {
     if (target?.role === 'admin') return toast.error('Não é possível eliminar um administrador');
     
     try {
-      const { error } = await supabase
-        .from('app_profiles')
-        .delete()
-        .eq('id', id);
+      const { data, error } = await supabase.functions.invoke('admin-delete-user', {
+        body: { user_id: id }
+      });
         
-      if (error) throw error;
+      if (error || (data && data.error)) {
+        throw new Error(error?.message || data?.error || 'Erro ao eliminar utilizador');
+      }
 
       setProfiles(prev => prev.filter(p => p.id !== id));
-      toast.success('Utilizador eliminado. Lembre-se de também remover o email em "Authentication > Users" no painel do Supabase se precisar de o reutilizar.');
+      toast.success('Utilizador e credenciais eliminados com sucesso.');
     } catch (err: any) {
       toast.error(err.message || 'Erro ao eliminar utilizador');
     }
