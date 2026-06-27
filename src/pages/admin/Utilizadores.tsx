@@ -18,8 +18,32 @@ import { toast } from 'sonner';
 export default function Utilizadores() {
   const { profiles, setProfiles, reloadProfiles } = useApp();
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ nome: '', role: 'aluno' as Role });
+  const [form, setForm] = useState({ nome: 'Aluno. ', role: 'aluno' as Role });
   const [creating, setCreating] = useState(false);
+
+  const handleRoleChange = (role: Role) => {
+    const prefixes: Record<Role, string> = {
+      aluno: 'Aluno. ',
+      professor: 'Prof. ',
+      admin: 'Admin. ',
+    };
+    const otherPrefixes = ['Aluno. ', 'Prof. ', 'Admin. '];
+    const matchedPrefix = otherPrefixes.find(p => form.nome.startsWith(p));
+    
+    if (matchedPrefix) {
+      const nameWithoutPrefix = form.nome.slice(matchedPrefix.length);
+      setForm({ nome: prefixes[role] + nameWithoutPrefix, role });
+    } else {
+      setForm({ nome: prefixes[role] + form.nome, role });
+    }
+  };
+
+  const handleOpenChange = (isOpen: boolean) => {
+    setOpen(isOpen);
+    if (isOpen) {
+      setForm({ nome: 'Aluno. ', role: 'aluno' });
+    }
+  };
 
   const handleCreate = async () => {
     if (!form.nome) return toast.error('Preencha o nome do utilizador');
@@ -48,7 +72,7 @@ export default function Utilizadores() {
 
       toast.success(`Utilizador criado. Chave provisória: ${chave}`);
       setOpen(false);
-      setForm({ nome: '', role: 'aluno' });
+      setForm({ nome: 'Aluno. ', role: 'aluno' });
     } catch (err: any) {
       toast.error(err.message || 'Erro ao criar utilizador');
     } finally {
@@ -114,7 +138,7 @@ export default function Utilizadores() {
           <h1 className="text-2xl font-bold">Utilizadores</h1>
           <p className="text-sm text-muted-foreground">Gere as contas de administradores, professores e alunos.</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={handleOpenChange}>
           <DialogTrigger asChild>
             <Button><Plus className="w-4 h-4 mr-2" />Novo Utilizador</Button>
           </DialogTrigger>
@@ -123,7 +147,7 @@ export default function Utilizadores() {
             <div className="space-y-3">
               <div><Label>Nome</Label><Input value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} /></div>
               <div><Label>Perfil</Label>
-                <Select value={form.role} onValueChange={(v) => setForm({ ...form, role: v as Role })}>
+                <Select value={form.role} onValueChange={handleRoleChange}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="admin">Administrador</SelectItem>
