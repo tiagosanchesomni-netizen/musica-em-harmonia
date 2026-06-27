@@ -174,6 +174,11 @@ export default function Login() {
       toast.error('Introduza um email válido');
       return;
     }
+    const isTempEmail = faEmail.toLowerCase().startsWith('temp_') && faEmail.toLowerCase().endsWith('@grt.pt');
+    if (isTempEmail) {
+      toast.error('Email Inválido, meta o seu email');
+      return;
+    }
     if (!isPasswordStrong) {
       toast.error('A palavra-passe não cumpre todos os requisitos de segurança');
       return;
@@ -448,12 +453,13 @@ export default function Login() {
           {screen === 'login' && (
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="emailOrName">Email ou Nome</Label>
+                <Label htmlFor="emailOrName">Email</Label>
                 <div className="relative">
-                  <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="emailOrName"
-                    placeholder="nome ou email@exemplo.com"
+                    type="email"
+                    placeholder="email@exemplo.com"
                     className="pl-10"
                     value={emailOrName}
                     onChange={(e) => setEmailOrName(e.target.value)}
