@@ -150,6 +150,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
+  useEffect(() => {
+    const channel = supabase
+      .channel('realtime-notificacoes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'app_notificacoes' },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setNotificacoesState(prev => {
+              if (prev.some(n => n.id === payload.new.id)) return prev;
+              return [payload.new as Notificacao, ...prev];
+            });
+          } else if (payload.eventType === 'UPDATE') {
+            setNotificacoesState(prev =>
+              prev.map(n => n.id === payload.new.id ? (payload.new as Notificacao) : n)
+            );
+          } else if (payload.eventType === 'DELETE') {
+            setNotificacoesState(prev =>
+              prev.filter(n => n.id !== payload.old.id)
+            );
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   const logout = async () => {
     await supabase.auth.signOut();
     setCurrentUser(undefined);
