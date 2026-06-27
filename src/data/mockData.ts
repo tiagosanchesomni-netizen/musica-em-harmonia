@@ -27,6 +27,7 @@ export type TipoAula = 'normal' | 'reposicao';
 export interface Aula {
   id: string;
   sala_id: string;
+  nome?: string;
   data_hora: string; // ISO
   duracao: number; // minutos
   tipo: TipoAula;

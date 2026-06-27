@@ -34,6 +34,7 @@ export default function ProfessorAulas() {
   // Class creation states
   const [openCreate, setOpenCreate] = useState(false);
   const [form, setForm] = useState({
+    nome: '',
     sala_id: '',
     data: new Date().toISOString().split('T')[0],
     hora: '10:00',
@@ -72,6 +73,7 @@ export default function ProfessorAulas() {
       const newAulaId = 'au-prof-' + Date.now();
       const novaAula = {
         id: newAulaId,
+        nome: form.nome.trim(),
         sala_id: form.sala_id,
         data_hora: dateTarget.toISOString(),
         duracao: form.duracao,
@@ -85,6 +87,7 @@ export default function ProfessorAulas() {
         .from('app_aulas')
         .insert({
           id: newAulaId,
+          nome: form.nome.trim(),
           sala_id: form.sala_id,
           data_hora: dateTarget.toISOString(),
           duracao: form.duracao,
@@ -159,6 +162,7 @@ export default function ProfessorAulas() {
 
       setOpenCreate(false);
       setForm({
+        nome: '',
         sala_id: salas[0]?.id || '',
         data: new Date().toISOString().split('T')[0],
         hora: '10:00',
@@ -175,6 +179,7 @@ export default function ProfessorAulas() {
 
   const openCreateDialog = () => {
     setForm({
+      nome: '',
       sala_id: salas[0]?.id || '',
       data: new Date().toISOString().split('T')[0],
       hora: '10:00',
@@ -389,6 +394,7 @@ export default function ProfessorAulas() {
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
+                    {a.nome && <span className="font-bold text-primary">{a.nome}</span>}
                     <CalendarDays className="w-4 h-4 text-muted-foreground" />
                     <span className="font-semibold">{formatDataHora(a.data_hora)}</span>
                     <Badge className={cfg.className}>{cfg.label}</Badge>
@@ -412,7 +418,7 @@ export default function ProfessorAulas() {
         <DialogContent className={previewDoc ? "max-w-4xl w-[90vw]" : "max-w-lg"}>
           <DialogHeader>
             <DialogTitle>
-              {previewDoc ? `Pré-visualização • ${previewDoc.nome}` : `Aula • ${selected && formatDataHora(selected.data_hora)}`}
+              {previewDoc ? `Pré-visualização • ${previewDoc.nome}` : `${selected?.nome || 'Aula'} • ${selected && formatDataHora(selected.data_hora)}`}
             </DialogTitle>
           </DialogHeader>
 
@@ -609,29 +615,35 @@ export default function ProfessorAulas() {
           <DialogHeader>
             <DialogTitle>Nova Aula</DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-3">
             <div>
-              <Label>Sala</Label>
-              <Select value={form.sala_id} onValueChange={v => setForm({ ...form, sala_id: v })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione uma sala" />
-                </SelectTrigger>
-                <SelectContent>
-                  {salas.map(s => <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <Label>Nome da Aula</Label>
+              <Input value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} placeholder="Ex: Aula de Guitarra, Aula de Piano" />
             </div>
-            <div>
-              <Label>Duração (min)</Label>
-              <Input type="number" value={form.duracao} onChange={e => setForm({ ...form, duracao: +e.target.value })} />
-            </div>
-            <div>
-              <Label>Data</Label>
-              <Input type="date" value={form.data} onChange={e => setForm({ ...form, data: e.target.value })} />
-            </div>
-            <div>
-              <Label>Hora</Label>
-              <Input type="time" value={form.hora} onChange={e => setForm({ ...form, hora: e.target.value })} />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Sala</Label>
+                <Select value={form.sala_id} onValueChange={v => setForm({ ...form, sala_id: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione uma sala" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {salas.map(s => <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Duração (min)</Label>
+                <Input type="number" value={form.duracao} onChange={e => setForm({ ...form, duracao: +e.target.value })} />
+              </div>
+              <div>
+                <Label>Data</Label>
+                <Input type="date" value={form.data} onChange={e => setForm({ ...form, data: e.target.value })} />
+              </div>
+              <div>
+                <Label>Hora</Label>
+                <Input type="time" value={form.hora} onChange={e => setForm({ ...form, hora: e.target.value })} />
+              </div>
             </div>
           </div>
 

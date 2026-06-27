@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS public.app_aulas (
   data_original TEXT,
   presencas_finalizadas BOOLEAN DEFAULT false,
   grupo_id TEXT,
+  nome TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

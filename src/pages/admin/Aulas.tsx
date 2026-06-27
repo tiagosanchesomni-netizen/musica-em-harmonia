@@ -32,9 +32,9 @@ export default function AdminAulas() {
   const [folderCreateOpen, setFolderCreateOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [form, setForm] = useState<{
-    sala_id: string; data: string; hora: string; duracao: number;
+    nome: string; sala_id: string; data: string; hora: string; duracao: number;
     professores: string[]; alunos: string[]; semanal: boolean;
-  }>({ sala_id: '', data: '', hora: '10:00', duracao: 60, professores: [], alunos: [], semanal: false });
+  }>({ nome: '', sala_id: '', data: '', hora: '10:00', duracao: 60, professores: [], alunos: [], semanal: false });
 
   const professores = profiles.filter(p => p.role === 'professor' && (!p.suspenso || form.professores.includes(p.id)));
   const alunos = profiles.filter(p => p.role === 'aluno' && (!p.suspenso || form.alunos.includes(p.id)));
@@ -42,6 +42,7 @@ export default function AdminAulas() {
   const openCreate = () => {
     setEditing(null);
     setForm({ 
+      nome: '',
       sala_id: salas[0]?.id || '', 
       data: new Date().toISOString().slice(0, 10), 
       hora: '10:00', 
@@ -74,6 +75,7 @@ export default function AdminAulas() {
         if (a.id === editing.id) {
           return { 
             ...a, 
+            nome: form.nome.trim(),
             sala_id: form.sala_id, 
             data_hora, 
             duracao: form.duracao, 
@@ -89,6 +91,7 @@ export default function AdminAulas() {
           ];
           return {
             ...a,
+            nome: form.nome.trim(),
             professores: form.professores, // mantém professores em sincronia
             alunos: updatedAlunos
           };
@@ -108,6 +111,7 @@ export default function AdminAulas() {
           
           novasAulas.push({
             id: 'au-' + Date.now() + '-' + i,
+            nome: form.nome.trim(),
             sala_id: form.sala_id,
             data_hora: dataObj.toISOString(),
             duracao: form.duracao,
@@ -125,6 +129,7 @@ export default function AdminAulas() {
       } else {
         const nova: Aula = {
           id: 'au' + Date.now(), 
+          nome: form.nome.trim(),
           sala_id: form.sala_id, 
           data_hora, 
           duracao: form.duracao,
@@ -388,6 +393,7 @@ export default function AdminAulas() {
     setEditing(aula);
     const d = new Date(aula.data_hora);
     setForm({
+      nome: aula.nome || '',
       sala_id: aula.sala_id,
       data: d.toISOString().slice(0, 10),
       hora: d.toTimeString().slice(0, 5),
@@ -717,7 +723,10 @@ export default function AdminAulas() {
               const cfg = estadoConfig[a.estado];
               return (
                 <TableRow key={a.id}>
-                  <TableCell className="font-medium cursor-pointer hover:underline text-primary" onClick={() => { setSelectedClasswork(a); setSelectedFolderId('none'); }}>{formatDataHora(a.data_hora)}</TableCell>
+                  <TableCell className="cursor-pointer" onClick={() => { setSelectedClasswork(a); setSelectedFolderId('none'); }}>
+                    <div className="font-semibold hover:underline text-primary">{a.nome || 'Aula'}</div>
+                    <div className="text-[10px] text-muted-foreground">{formatDataHora(a.data_hora)}</div>
+                  </TableCell>
                   <TableCell>{getSala(a.sala_id)?.nome || '—'}</TableCell>
                   <TableCell className="text-xs">{a.professores.map(p => getProfile(p)?.nome).join(', ')}</TableCell>
                   <TableCell className="text-xs">
@@ -754,16 +763,22 @@ export default function AdminAulas() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>{editing ? 'Editar Aula' : 'Nova Aula'}</DialogTitle></DialogHeader>
-          <div className="grid grid-cols-2 gap-3">
-            <div><Label>Sala</Label>
-              <Select value={form.sala_id} onValueChange={v => setForm({ ...form, sala_id: v })}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{salas.map(s => <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>)}</SelectContent>
-              </Select>
+          <div className="space-y-3">
+            <div>
+              <Label>Nome da Aula</Label>
+              <Input value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} placeholder="Ex: Aula de Guitarra, Aula de Piano" />
             </div>
-            <div><Label>Duração (min)</Label><Input type="number" value={form.duracao} onChange={e => setForm({ ...form, duracao: +e.target.value })} /></div>
-            <div><Label>Data</Label><Input type="date" value={form.data} onChange={e => setForm({ ...form, data: e.target.value })} /></div>
-            <div><Label>Hora</Label><Input type="time" value={form.hora} onChange={e => setForm({ ...form, hora: e.target.value })} /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label>Sala</Label>
+                <Select value={form.sala_id} onValueChange={v => setForm({ ...form, sala_id: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>{salas.map(s => <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div><Label>Duração (min)</Label><Input type="number" value={form.duracao} onChange={e => setForm({ ...form, duracao: +e.target.value })} /></div>
+              <div><Label>Data</Label><Input type="date" value={form.data} onChange={e => setForm({ ...form, data: e.target.value })} /></div>
+              <div><Label>Hora</Label><Input type="time" value={form.hora} onChange={e => setForm({ ...form, hora: e.target.value })} /></div>
+            </div>
           </div>
 
           {!editing && (
@@ -827,7 +842,7 @@ export default function AdminAulas() {
         <DialogContent className={previewDoc ? "max-w-4xl w-[90vw]" : "max-w-lg"}>
           <DialogHeader>
             <DialogTitle>
-              {previewDoc ? `Pré-visualização • ${previewDoc.nome}` : `Aula • ${selectedClasswork && formatDataHora(selectedClasswork.data_hora)}`}
+              {previewDoc ? `Pré-visualização • ${previewDoc.nome}` : `${selectedClasswork?.nome || 'Aula'} • ${selectedClasswork && formatDataHora(selectedClasswork.data_hora)}`}
             </DialogTitle>
           </DialogHeader>
 
