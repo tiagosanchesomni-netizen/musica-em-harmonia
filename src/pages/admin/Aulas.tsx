@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Pencil, CalendarDays } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import { estadoConfig, formatDataHora, formatData, formatHora } from '@/lib/aulaHelpers';
 
 export default function AdminAulas() {
@@ -179,11 +180,40 @@ export default function AdminAulas() {
 
     setNotificacoes(prev => [adminNotif, ...alunoNotifs, ...prev]);
 
-    // Simulate sending email to each student
-    editing.alunos.forEach(alunoId => {
+    // Enviar emails reais via Resend para cada aluno
+    const dataAula = `${formatData(editing.data_hora)} às ${formatHora(editing.data_hora)}`;
+    editing.alunos.forEach(async (alunoId) => {
       const p = getProfile(alunoId);
-      if (p && p.email) {
-        toast.info(`E-mail enviado para ${p.email}: A aula no dia ${formatData(editing.data_hora)} na hora ${formatHora(editing.data_hora)} foi cancelada pelo professor.`, { duration: 6000 });
+      if (p?.email) {
+        try {
+          await supabase.functions.invoke('send-email', {
+            body: {
+              to: p.email,
+              subject: `❌ Aula cancelada — ${dataAula}`,
+              html: `
+                <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; background: #f9fafb; padding: 32px; border-radius: 12px;">
+                  <div style="text-align: center; margin-bottom: 24px;">
+                    <h1 style="color: #1e1b4b; font-size: 22px; margin: 0;">🎵 Escola de Música GRT</h1>
+                    <p style="color: #6b7280; margin: 8px 0 0;">Notificação de Cancelamento</p>
+                  </div>
+                  <div style="background: white; border-radius: 8px; padding: 24px; border: 1px solid #e5e7eb;">
+                    <div style="background: #fef2f2; border-left: 4px solid #ef4444; padding: 12px 16px; border-radius: 4px; margin-bottom: 16px;">
+                      <p style="color: #dc2626; font-weight: bold; margin: 0;">❌ Aula Cancelada</p>
+                    </div>
+                    <p style="color: #374151; margin: 0 0 8px;">Olá <strong>${p.nome}</strong>,</p>
+                    <p style="color: #374151; margin: 0 0 16px;">
+                      A sua aula de <strong>${dataAula}</strong> com o(a) Prof. <strong>${professorNames}</strong> foi cancelada e está a aguardar nova data de reposição.
+                    </p>
+                    <p style="color: #6b7280; font-size: 13px; margin: 0;">Será notificado(a) quando a reposição for marcada.</p>
+                  </div>
+                  <p style="color: #9ca3af; font-size: 12px; text-align: center; margin-top: 24px;">Escola de Música GRT — Sistema de Gestão</p>
+                </div>
+              `,
+            },
+          });
+        } catch {
+          console.warn(`Falha ao enviar email para ${p.email}`);
+        }
       }
     });
 

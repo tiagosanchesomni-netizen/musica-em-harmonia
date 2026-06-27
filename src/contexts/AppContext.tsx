@@ -12,6 +12,7 @@ interface AppContextType {
   currentUser: Profile | undefined;
   loading: boolean;
   logout: () => Promise<void>;
+  reloadProfiles: () => Promise<void>;
 
   profiles: Profile[]; setProfiles: React.Dispatch<React.SetStateAction<Profile[]>>;
   salas: Sala[]; setSalas: React.Dispatch<React.SetStateAction<Sala[]>>;
@@ -155,12 +156,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setCurrentUserId('');
   };
 
+  const reloadProfiles = async () => {
+    const { data } = await supabase.from('app_profiles').select('*');
+    if (data) setProfilesState(data);
+  };
+
   const value = useMemo<AppContextType>(() => ({
     currentRole, setCurrentRole,
     currentUserId, setCurrentUserId,
     currentUser,
     loading,
     logout,
+    reloadProfiles,
     profiles, setProfiles,
     salas, setSalas,
     aulas, setAulas,

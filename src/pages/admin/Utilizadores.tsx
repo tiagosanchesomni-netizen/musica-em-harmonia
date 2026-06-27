@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useApp } from '@/contexts/AppContext';
-import { Profile, Role } from '@/data/mockData';
+import { Role } from '@/data/mockData';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -12,10 +13,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Key, Trash2, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { supabase } from '@/integrations/supabase/client';
+
 
 export default function Utilizadores() {
-  const { profiles, setProfiles, currentUserId } = useApp();
+  const { profiles, setProfiles, reloadProfiles } = useApp();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ nome: '', role: 'aluno' as Role });
   const [creating, setCreating] = useState(false);
@@ -28,7 +29,7 @@ export default function Utilizadores() {
     const tempEmail = `temp_${Date.now()}@grt.pt`;
 
     try {
-      // Call Supabase Edge Function to create the auth user
+      // Call Supabase Edge Function to create both the auth user and profile row
       const { data, error } = await supabase.functions.invoke('admin-create-user', {
         body: {
           email: tempEmail,
@@ -42,16 +43,9 @@ export default function Utilizadores() {
         throw new Error(error?.message || data?.error || 'Erro ao criar utilizador');
       }
 
-      const novo: Profile = {
-        id: data.user_id, // Match ID to UUID from auth.users
-        nome: form.nome,
-        email: tempEmail,
-        role: form.role,
-        primeiro_acesso: true,
-        chave_provisoria: chave,
-      };
+      // Reload profiles from DB (edge function already inserted the profile row)
+      await reloadProfiles();
 
-      await setProfiles(p => [...p, novo]);
       toast.success(`Utilizador criado. Chave provisória: ${chave}`);
       setOpen(false);
       setForm({ nome: '', role: 'aluno' });
