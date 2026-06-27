@@ -23,7 +23,7 @@ function AcessoBadge({ acesso, getProfile }: { acesso: AcessoAlunos; getProfile:
 
 export default function AdminDocumentos() {
   const { documentos, setDocumentos, pastas, setPastas, getProfile, profiles, currentUserId } = useApp();
-  const alunos = profiles.filter(p => p.role === 'aluno');
+  const alunos = profiles.filter(p => p.role === 'aluno' && !p.suspenso);
   const alunoOptions = alunos.map(a => ({ value: a.id, label: a.nome }));
 
   const [openPasta, setOpenPasta] = useState(false);

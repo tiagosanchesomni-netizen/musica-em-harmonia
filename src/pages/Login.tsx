@@ -104,9 +104,15 @@ export default function Login() {
 
       const { data: prof } = await supabase
         .from('app_profiles')
-        .select('role, primeiro_acesso, nome, email')
+        .select('role, primeiro_acesso, nome, email, suspenso')
         .eq('auth_user_id', data.user.id)
         .single();
+
+      if (prof?.suspenso) {
+        await supabase.auth.signOut();
+        toast.error('Esta conta encontra-se temporariamente suspensa. Contacte a administração.');
+        return;
+      }
 
       if (prof?.primeiro_acesso) {
         setFaName(prof.nome || '');

@@ -10,6 +10,8 @@ export interface Profile {
   role: Role;
   primeiro_acesso: boolean;
   chave_provisoria?: string;
+  suspenso?: boolean;
+  aulas_suspensas?: string[];
 }
 
 export interface Sala {

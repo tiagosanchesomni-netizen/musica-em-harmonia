@@ -23,7 +23,7 @@ function AcessoBadge({ acesso }: { acesso: AcessoAlunos }) {
 export default function ProfessorDocumentos() {
   const { pastas, setPastas, documentos, setDocumentos, currentUserId, profiles, getProfile } = useApp();
   const minhasPastas = pastas.filter(p => p.criado_por === currentUserId);
-  const alunos = profiles.filter(p => p.role === 'aluno');
+  const alunos = profiles.filter(p => p.role === 'aluno' && !p.suspenso);
   const alunoOptions = alunos.map(a => ({ value: a.id, label: a.nome }));
 
   const [openPasta, setOpenPasta] = useState(false);

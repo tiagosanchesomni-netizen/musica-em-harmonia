@@ -10,13 +10,13 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Key, Trash2, Eye } from 'lucide-react';
+import { Plus, Key, Trash2, Eye, Play, Pause } from 'lucide-react';
 import { toast } from 'sonner';
 
 
 
 export default function Utilizadores() {
-  const { profiles, setProfiles, reloadProfiles } = useApp();
+  const { profiles, setProfiles, reloadProfiles, suspenderUtilizador, reativarUtilizador } = useApp();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ nome: 'Aluno. ', role: 'aluno' as Role });
   const [creating, setCreating] = useState(false);
@@ -129,6 +129,24 @@ export default function Utilizadores() {
     }
   };
 
+  const handleSuspender = async (id: string) => {
+    try {
+      await suspenderUtilizador(id);
+      toast.success("Utilizador colocado Fora temporariamente e removido de aulas futuras.");
+    } catch (err) {
+      toast.error("Erro ao suspender utilizador");
+    }
+  };
+
+  const handleReativar = async (id: string) => {
+    try {
+      await reativarUtilizador(id);
+      toast.success("Atividade retomada e aulas restabelecidas.");
+    } catch (err) {
+      toast.error("Erro ao reativar utilizador");
+    }
+  };
+
   const roleLabel: Record<Role, string> = { admin: 'Admin', professor: 'Professor', aluno: 'Aluno' };
 
   return (
@@ -185,17 +203,34 @@ export default function Utilizadores() {
                 <TableCell>{p.email || <span className="text-muted-foreground italic">Não associado</span>}</TableCell>
                 <TableCell><Badge variant="secondary">{roleLabel[p.role]}</Badge></TableCell>
                 <TableCell>
-                  {p.primeiro_acesso
-                    ? <Badge className="bg-status-absent text-status-absent-foreground">1.º acesso pendente</Badge>
-                    : <Badge className="bg-status-taught text-status-taught-foreground">Ativo</Badge>}
+                  {p.suspenso ? (
+                    <Badge className="bg-destructive text-white hover:bg-destructive">Fora temporariamente</Badge>
+                  ) : p.primeiro_acesso ? (
+                    <Badge className="bg-status-absent text-status-absent-foreground">1.º acesso pendente</Badge>
+                  ) : (
+                    <Badge className="bg-status-taught text-status-taught-foreground">Ativo</Badge>
+                  )}
                 </TableCell>
                 <TableCell className="text-right space-x-1">
-                  {p.primeiro_acesso && (
+                  {p.primeiro_acesso && !p.suspenso && (
                     <Button size="sm" variant="ghost" onClick={() => showProvisionalKey(p)} className="text-primary hover:text-primary">
                       <Eye className="w-4 h-4 mr-1" />Mostrar chave
                     </Button>
                   )}
-                  <Button size="sm" variant="ghost" onClick={() => resetPassword(p)}><Key className="w-4 h-4 mr-1" />Repor chave</Button>
+                  {!p.suspenso && (
+                    <Button size="sm" variant="ghost" onClick={() => resetPassword(p)}><Key className="w-4 h-4 mr-1" />Repor chave</Button>
+                  )}
+                  {p.role !== 'admin' && (
+                    p.suspenso ? (
+                      <Button size="sm" variant="ghost" onClick={() => handleReativar(p.id)} className="text-green-600 hover:text-green-700">
+                        <Play className="w-4 h-4 mr-1" />Retomar
+                      </Button>
+                    ) : (
+                      <Button size="sm" variant="ghost" onClick={() => handleSuspender(p.id)} className="text-amber-600 hover:text-amber-700">
+                        <Pause className="w-4 h-4 mr-1" />Suspender
+                      </Button>
+                    )
+                  )}
                   <Button size="sm" variant="ghost" onClick={() => remove(p.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
                 </TableCell>
               </TableRow>

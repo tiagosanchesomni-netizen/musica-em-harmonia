@@ -24,6 +24,8 @@ interface AppContextType {
 
   getProfile: (id: string) => Profile | undefined;
   getSala: (id: string) => Sala | undefined;
+  suspenderUtilizador: (userId: string) => Promise<void>;
+  reativarUtilizador: (userId: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -182,6 +184,130 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
   }, [currentUserId]);
 
+  const suspenderUtilizador = async (userId: string) => {
+    const target = profiles.find(p => p.id === userId);
+    if (!target || target.role === 'admin') return;
+
+    const agoraStr = new Date().toISOString();
+    const aulasFuturas = aulas.filter(aula => {
+      const isFutura = new Date(aula.data_hora).getTime() >= new Date(agoraStr).getTime();
+      const belongs = aula.alunos.includes(userId) || aula.professores.includes(userId);
+      const isAtiva = aula.estado === 'agendada' || aula.estado === 'pendente_reposicao';
+      return isFutura && belongs && isAtiva;
+    });
+
+    const aulaIds = aulasFuturas.map(a => a.id);
+
+    try {
+      const { error: profileErr } = await supabase
+        .from('app_profiles')
+        .update({
+          suspenso: true,
+          aulas_suspensas: aulaIds
+        })
+        .eq('id', userId);
+
+      if (profileErr) throw profileErr;
+
+      for (const aula of aulasFuturas) {
+        const novosAlunos = aula.alunos.filter(id => id !== userId);
+        const novosProfessores = aula.professores.filter(id => id !== userId);
+        
+        const { error: aulaErr } = await supabase
+          .from('app_aulas')
+          .update({
+            alunos: novosAlunos,
+            professores: novosProfessores
+          })
+          .eq('id', aula.id);
+
+        if (aulaErr) console.error("Erro ao atualizar aula:", aulaErr);
+      }
+
+      setProfilesState(prev => prev.map(p => p.id === userId ? { ...p, suspenso: true, aulas_suspensas: aulaIds } : p));
+      setAulasState(prev => prev.map(aula => {
+        if (aulaIds.includes(aula.id)) {
+          return {
+            ...aula,
+            alunos: aula.alunos.filter(id => id !== userId),
+            professores: aula.professores.filter(id => id !== userId)
+          };
+        }
+        return aula;
+      }));
+
+    } catch (err) {
+      console.error("Erro ao suspender utilizador:", err);
+      throw err;
+    }
+  };
+
+  const reativarUtilizador = async (userId: string) => {
+    const target = profiles.find(p => p.id === userId);
+    if (!target) return;
+
+    const aulaIds = target.aulas_suspensas || [];
+
+    try {
+      const { error: profileErr } = await supabase
+        .from('app_profiles')
+        .update({
+          suspenso: false,
+          aulas_suspensas: []
+        })
+        .eq('id', userId);
+
+      if (profileErr) throw profileErr;
+
+      const agoraStr = new Date().toISOString();
+      for (const id of aulaIds) {
+        const aulaObj = aulas.find(a => a.id === id);
+        if (!aulaObj) continue;
+        
+        const isFutura = new Date(aulaObj.data_hora).getTime() >= new Date(agoraStr).getTime();
+        const isAtiva = aulaObj.estado === 'agendada' || aulaObj.estado === 'pendente_reposicao';
+        if (isFutura && isAtiva) {
+          const novosAlunos = target.role === 'aluno' && !aulaObj.alunos.includes(userId)
+            ? [...aulaObj.alunos, userId]
+            : aulaObj.alunos;
+          const novosProfessores = target.role === 'professor' && !aulaObj.professores.includes(userId)
+            ? [...aulaObj.professores, userId]
+            : aulaObj.professores;
+
+          const { error: aulaErr } = await supabase
+            .from('app_aulas')
+            .update({
+              alunos: novosAlunos,
+              professores: novosProfessores
+            })
+            .eq('id', id);
+
+          if (aulaErr) console.error("Erro ao re-adicionar a aula:", aulaErr);
+        }
+      }
+
+      setProfilesState(prev => prev.map(p => p.id === userId ? { ...p, suspenso: false, aulas_suspensas: [] } : p));
+      setAulasState(prev => prev.map(aula => {
+        if (aulaIds.includes(aula.id)) {
+          const isFutura = new Date(aula.data_hora).getTime() >= new Date(agoraStr).getTime();
+          const isAtiva = aula.estado === 'agendada' || aula.estado === 'pendente_reposicao';
+          if (isFutura && isAtiva) {
+            return {
+              ...aula,
+              alunos: target.role === 'aluno' && !aula.alunos.includes(userId) ? [...aula.alunos, userId] : aula.alunos,
+              professores: target.role === 'professor' && !aula.professores.includes(userId) ? [...aula.professores, userId] : aula.professores
+            };
+          }
+        }
+        return aula;
+      }));
+
+    } catch (err) {
+      console.error("Erro ao reativar utilizador:", err);
+      throw err;
+    }
+  };
+
   const logout = async () => {
     await supabase.auth.signOut();
     setCurrentUser(undefined);
@@ -209,6 +335,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     notificacoes, setNotificacoes,
     getProfile: (id: string) => profiles.find(p => p.id === id),
     getSala: (id: string) => salas.find(s => s.id === id),
+    suspenderUtilizador,
+    reativarUtilizador,
   }), [currentRole, currentUserId, currentUser, loading, profiles, salas, aulas, assiduidades, pastas, documentos, notificacoes]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

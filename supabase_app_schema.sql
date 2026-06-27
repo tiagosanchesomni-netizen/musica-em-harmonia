@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS public.app_profiles (
   role TEXT NOT NULL CHECK (role IN ('admin', 'professor', 'aluno')),
   primeiro_acesso BOOLEAN NOT NULL DEFAULT false,
   chave_provisoria TEXT,
+  suspenso BOOLEAN DEFAULT false,
+  aulas_suspensas TEXT[] DEFAULT ARRAY[]::TEXT[],
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

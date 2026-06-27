@@ -21,9 +21,6 @@ export default function AdminAulas() {
     assiduidades, setAssiduidades, setNotificacoes,
     documentos, setDocumentos, pastas, setPastas, currentUserId 
   } = useApp();
-  const professores = profiles.filter(p => p.role === 'professor');
-  const alunos = profiles.filter(p => p.role === 'aluno');
-
   const [open, setOpen] = useState(false);
   const [filtroTempo, setFiltroTempo] = useState<string>('todas');
   const [editing, setEditing] = useState<Aula | null>(null);
@@ -38,6 +35,9 @@ export default function AdminAulas() {
     sala_id: string; data: string; hora: string; duracao: number;
     professores: string[]; alunos: string[]; semanal: boolean;
   }>({ sala_id: '', data: '', hora: '10:00', duracao: 60, professores: [], alunos: [], semanal: false });
+
+  const professores = profiles.filter(p => p.role === 'professor' && (!p.suspenso || form.professores.includes(p.id)));
+  const alunos = profiles.filter(p => p.role === 'aluno' && (!p.suspenso || form.alunos.includes(p.id)));
 
   const openCreate = () => {
     setEditing(null);
