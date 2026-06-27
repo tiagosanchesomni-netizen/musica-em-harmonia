@@ -151,6 +151,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (!currentUserId) return;
+
     const channel = supabase
       .channel('realtime-notificacoes')
       .on(
@@ -178,7 +180,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [currentUserId]);
 
   const logout = async () => {
     await supabase.auth.signOut();
