@@ -81,15 +81,25 @@ export default function Login() {
       let emailToUse = emailOrName.trim();
 
       if (!emailToUse.includes('@')) {
-        const { data: matched } = await supabase
+        let { data: matched } = await supabase
           .from('app_profiles')
           .select('email')
           .ilike('nome', emailToUse)
           .limit(1)
-          .single();
+          .maybeSingle();
+
+        if (!matched) {
+          const { data: partialMatch } = await supabase
+            .from('app_profiles')
+            .select('email')
+            .ilike('nome', `%${emailToUse}%`)
+            .limit(1)
+            .maybeSingle();
+          matched = partialMatch;
+        }
 
         if (!matched?.email) {
-          toast.error('Utilizador não encontrado');
+          toast.error('Utilizador não encontrado. Introduza o seu e-mail ou o nome completo registado.');
           return;
         }
         emailToUse = matched.email;
