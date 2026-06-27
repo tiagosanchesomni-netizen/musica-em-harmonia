@@ -43,7 +43,7 @@ export default function ProfessorAulas() {
   });
   const [saving, setSaving] = useState(false);
 
-  const alunosAtivos = profiles.filter(p => p.role === 'aluno' && !p.suspenso);
+  const alunosAtivos = profiles.filter(p => p.role === 'aluno' && !p.suspenso).sort((a, b) => a.nome.localeCompare(b.nome, 'pt'));
 
   const toggleAluno = (alunoId: string) => {
     setForm(prev => {

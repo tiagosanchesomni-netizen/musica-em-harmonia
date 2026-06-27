@@ -36,8 +36,8 @@ export default function AdminAulas() {
     professores: string[]; alunos: string[]; semanal: boolean;
   }>({ nome: '', sala_id: '', data: '', hora: '10:00', duracao: 60, professores: [], alunos: [], semanal: false });
 
-  const professores = profiles.filter(p => p.role === 'professor' && (!p.suspenso || form.professores.includes(p.id)));
-  const alunos = profiles.filter(p => p.role === 'aluno' && (!p.suspenso || form.alunos.includes(p.id)));
+  const professores = profiles.filter(p => p.role === 'professor' && (!p.suspenso || form.professores.includes(p.id))).sort((a, b) => a.nome.localeCompare(b.nome, 'pt'));
+  const alunos = profiles.filter(p => p.role === 'aluno' && (!p.suspenso || form.alunos.includes(p.id))).sort((a, b) => a.nome.localeCompare(b.nome, 'pt'));
 
   const openCreate = () => {
     setEditing(null);
