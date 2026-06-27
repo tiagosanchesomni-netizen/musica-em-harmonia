@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS public.app_profiles (
   chave_provisoria TEXT,
   suspenso BOOLEAN DEFAULT false,
   aulas_suspensas TEXT[] DEFAULT ARRAY[]::TEXT[],
+  receber_emails BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

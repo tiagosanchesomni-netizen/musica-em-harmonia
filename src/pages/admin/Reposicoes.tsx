@@ -71,7 +71,7 @@ export default function AdminReposicoes() {
     const dataNovaAula = `${formatData(data_hora)} às ${formatHora(data_hora)}`;
     
     // Enviar cópia de reposição para todos os administradores
-    const adminEmails = profiles.filter(pr => pr.role === 'admin' && pr.email).map(pr => pr.email);
+    const adminEmails = profiles.filter(pr => pr.role === 'admin' && pr.email && pr.receber_emails !== false).map(pr => pr.email);
     adminEmails.forEach(async (adminEmail) => {
       try {
         await supabase.functions.invoke('send-email', {
@@ -106,7 +106,7 @@ export default function AdminReposicoes() {
 
     editing.alunos.forEach(async (alunoId) => {
       const p = getProfile(alunoId);
-      if (p?.email) {
+      if (p?.email && p.receber_emails !== false) {
         try {
           await supabase.functions.invoke('send-email', {
             body: {

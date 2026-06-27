@@ -12,6 +12,7 @@ export interface Profile {
   chave_provisoria?: string;
   suspenso?: boolean;
   aulas_suspensas?: string[];
+  receber_emails?: boolean;
 }
 
 export interface Sala {
