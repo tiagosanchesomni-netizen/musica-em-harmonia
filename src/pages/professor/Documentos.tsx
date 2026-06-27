@@ -192,7 +192,7 @@ export default function ProfessorDocumentos() {
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {minhasPastas.map(p => {
-          const docs = documentos.filter(d => d.pasta_id === p.id);
+          const docs = documentos.filter(d => d.pasta_id === p.id && d.criado_por === currentUserId);
           return (
             <Card key={p.id} className="p-4">
               <div className="flex items-center gap-2 mb-1">

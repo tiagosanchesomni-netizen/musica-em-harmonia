@@ -358,7 +358,7 @@ export default function ProfessorAulas() {
                 <div>
                   <h3 className="font-semibold text-sm mb-2">Documentos da aula</h3>
                   <div className="space-y-1 mb-3">
-                    {documentos.filter(d => d.aula_id === selected.id).map(d => {
+                    {documentos.filter(d => d.aula_id === selected.id && d.criado_por === currentUserId).map(d => {
                       const pasta = pastas.find(p => p.id === d.pasta_id);
                       return (
                         <div key={d.id} className="text-sm flex items-center justify-between bg-muted/40 p-2 rounded border">
@@ -380,7 +380,7 @@ export default function ProfessorAulas() {
                         </div>
                       );
                     })}
-                    {documentos.filter(d => d.aula_id === selected.id).length === 0 && (
+                    {documentos.filter(d => d.aula_id === selected.id && d.criado_por === currentUserId).length === 0 && (
                       <p className="text-xs text-muted-foreground italic p-2 border border-dashed rounded text-center">Nenhum documento associado a esta aula.</p>
                     )}
                   </div>
