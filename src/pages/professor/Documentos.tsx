@@ -27,10 +27,10 @@ export default function ProfessorDocumentos() {
   const alunoOptions = alunos.map(a => ({ value: a.id, label: a.nome }));
 
   const [openPasta, setOpenPasta] = useState(false);
-  const [pastaForm, setPastaForm] = useState<{ nome: string; todos: boolean; ids: string[] }>({ nome: '', todos: true, ids: [] });
+  const [pastaForm, setPastaForm] = useState<{ nome: string; todos: boolean; ids: string[] }>({ nome: '', todos: false, ids: [] });
 
   const [openDoc, setOpenDoc] = useState(false);
-  const [docForm, setDocForm] = useState<{ pasta_id?: string; todos: boolean; ids: string[] }>({ todos: true, ids: [] });
+  const [docForm, setDocForm] = useState<{ pasta_id?: string; todos: boolean; ids: string[] }>({ todos: false, ids: [] });
   const [previewDoc, setPreviewDoc] = useState<any | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -42,7 +42,7 @@ export default function ProfessorDocumentos() {
     };
     setPastas(prev => [...prev, nova]);
     toast.success('Pasta criada');
-    setPastaForm({ nome: '', todos: true, ids: [] });
+    setPastaForm({ nome: '', todos: false, ids: [] });
     setOpenPasta(false);
   };
 
@@ -91,7 +91,7 @@ export default function ProfessorDocumentos() {
     } finally {
       e.target.value = '';
       setOpenDoc(false);
-      setDocForm({ todos: true, ids: [] });
+      setDocForm({ todos: false, ids: [] });
     }
   };
 
