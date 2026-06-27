@@ -19,7 +19,7 @@ Deno.serve(async (req) => {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Não autorizado" }), {
-        status: 401,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -28,15 +28,15 @@ Deno.serve(async (req) => {
     const { data: { user: caller } } = await supabaseAdmin.auth.getUser(token);
     if (!caller) {
       return new Response(JSON.stringify({ error: "Sessão inválida" }), {
-        status: 401,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const { new_email, new_password } = await req.json();
     if (!new_email || !new_password || new_password.length < 8) {
-      return new Response(JSON.stringify({ error: "Campos inválidos" }), {
-        status: 400,
+      return new Response(JSON.stringify({ error: "Campos inválidos. A palavra-passe tem de ter pelo menos 8 caracteres." }), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -48,7 +48,17 @@ Deno.serve(async (req) => {
       email_confirm: true, // mark as confirmed immediately
     });
 
-    if (updateAuthErr) throw updateAuthErr;
+    if (updateAuthErr) {
+      // Return clear error message for duplicate emails or auth issues
+      let msg = updateAuthErr.message;
+      if (msg.includes("already registered") || msg.includes("already exists")) {
+        msg = "Este email já se encontra registado noutra conta.";
+      }
+      return new Response(JSON.stringify({ error: msg }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Update app_profiles: set real email, clear primeiro_acesso flag
     const { error: profileErr } = await supabaseAdmin
@@ -60,14 +70,19 @@ Deno.serve(async (req) => {
       })
       .eq("auth_user_id", caller.id);
 
-    if (profileErr) throw profileErr;
+    if (profileErr) {
+      return new Response(JSON.stringify({ error: profileErr.message }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err: any) {
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
+    return new Response(JSON.stringify({ error: err.message || err }), {
+      status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
