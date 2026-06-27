@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
-import { Upload, Check, X, FileText, Clock, CalendarDays, FolderPlus } from 'lucide-react';
+import { Upload, Check, X, FileText, Clock, CalendarDays, FolderPlus, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { estadoConfig, filtroProfessor, formatDataHora, formatData, formatHora, diasEntre } from '@/lib/aulaHelpers';
 import { Label } from '@/components/ui/label';
@@ -18,7 +18,7 @@ export default function ProfessorAulas() {
   const { 
     aulas, setAulas, currentUserId, getSala, getProfile, 
     assiduidades, setAssiduidades, documentos, setDocumentos, 
-    setNotificacoes, pastas, setPastas 
+    setNotificacoes, pastas, setPastas, profiles, salas
   } = useApp();
   
   const lista = filtroProfessor(aulas, currentUserId);
@@ -30,6 +30,159 @@ export default function ProfessorAulas() {
   const [selectedFolderId, setSelectedFolderId] = useState<string>('none');
   const [folderCreateOpen, setFolderCreateOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
+
+  // Class creation states
+  const [openCreate, setOpenCreate] = useState(false);
+  const [form, setForm] = useState({
+    sala_id: '',
+    data: new Date().toISOString().split('T')[0],
+    hora: '10:00',
+    duracao: 60,
+    alunos: [] as string[]
+  });
+  const [saving, setSaving] = useState(false);
+
+  const alunosAtivos = profiles.filter(p => p.role === 'aluno' && !p.suspenso);
+
+  const toggleAluno = (alunoId: string) => {
+    setForm(prev => {
+      const exists = prev.alunos.includes(alunoId);
+      const nextAlunos = exists 
+        ? prev.alunos.filter(id => id !== alunoId)
+        : [...prev.alunos, alunoId];
+      return { ...prev, alunos: nextAlunos };
+    });
+  };
+
+  const handleCreateClass = async () => {
+    if (!form.sala_id) return toast.error('Selecione uma sala');
+    if (!form.data) return toast.error('Selecione uma data');
+    if (!form.hora) return toast.error('Selecione uma hora');
+    if (form.alunos.length === 0) return toast.error('Selecione pelo menos um aluno');
+
+    setSaving(true);
+    try {
+      const dataHoraStr = `${form.data}T${form.hora}:00`;
+      const dateTarget = new Date(dataHoraStr);
+      const now = new Date();
+      
+      const diffTime = dateTarget.getTime() - now.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      const newAulaId = 'au-prof-' + Date.now();
+      const novaAula = {
+        id: newAulaId,
+        sala_id: form.sala_id,
+        data_hora: dateTarget.toISOString(),
+        duracao: form.duracao,
+        tipo: 'normal' as const,
+        estado: 'agendada' as const,
+        professores: [currentUserId],
+        alunos: form.alunos,
+      };
+
+      const { error: dbErr } = await supabase
+        .from('app_aulas')
+        .insert({
+          id: newAulaId,
+          sala_id: form.sala_id,
+          data_hora: dateTarget.toISOString(),
+          duracao: form.duracao,
+          tipo: 'normal',
+          estado: 'agendada',
+          professores: [currentUserId],
+          alunos: form.alunos,
+        });
+
+      if (dbErr) throw dbErr;
+
+      setAulas(prev => [...prev, novaAula]);
+
+      const newNotifs = form.alunos.map((aId, idx) => ({
+        id: `n-al-new-${Date.now()}-${idx}`,
+        mensagem: `Nova aula agendada para ${formatDataHora(dateTarget.toISOString())} com o(a) Prof. ${getProfile(currentUserId)?.nome || ''}.`,
+        lida: false,
+        tipo: 'reposicao_marcada' as const,
+        criado_em: new Date().toISOString(),
+        destinatario_role: 'aluno' as const,
+        aluno_id: aId,
+      }));
+
+      for (const n of newNotifs) {
+        await supabase.from('app_notificacoes').insert(n);
+      }
+      setNotificacoes(prev => [...newNotifs, ...prev]);
+
+      const formatDataStr = `${formatData(dateTarget.toISOString())} às ${formatHora(dateTarget.toISOString())}`;
+      const profName = getProfile(currentUserId)?.nome || '';
+      
+      form.alunos.forEach(async (alunoId) => {
+        const p = getProfile(alunoId);
+        if (p?.email && p.receber_emails !== false) {
+          try {
+            await supabase.functions.invoke('send-email', {
+              body: {
+                to: p.email,
+                subject: `📅 Nova aula agendada — ${formatDataStr}`,
+                html: `
+                  <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; background: #f9fafb; padding: 32px; border-radius: 12px;">
+                    <div style="text-align: center; margin-bottom: 24px;">
+                      <h1 style="color: #1e1b4b; font-size: 22px; margin: 0;">🎵 Escola de Música GRT</h1>
+                      <p style="color: #6b7280; margin: 8px 0 0;">Notificação de Agendamento</p>
+                    </div>
+                    <div style="background: white; border-radius: 8px; padding: 24px; border: 1px solid #e5e7eb;">
+                      <div style="background: #e0e7ff; border-left: 4px solid #4f46e5; padding: 12px 16px; border-radius: 4px; margin-bottom: 16px;">
+                        <p style="color: #4f46e5; font-weight: bold; margin: 0;">📅 Nova Aula Agendada</p>
+                      </div>
+                      <p style="color: #374151; margin: 0 0 8px;">Olá <strong>${p.nome}</strong>,</p>
+                      <p style="color: #374151; margin: 0 0 16px;">
+                        Foi agendada uma nova aula para si no dia <strong>${formatDataStr}</strong> com o(a) Prof. <strong>${profName}</strong> na <strong>${getSala(form.sala_id)?.nome || 'Sala'}</strong>.
+                      </p>
+                      <p style="color: #6b7280; font-size: 13px; margin: 0;">Por favor, compareça no horário agendado.</p>
+                    </div>
+                    <p style="color: #9ca3af; font-size: 12px; text-align: center; margin-top: 24px;">Escola de Música GRT — Sistema de Gestão</p>
+                  </div>
+                `,
+              },
+            });
+          } catch {
+            console.warn(`Falha ao enviar email para ${p.email}`);
+          }
+        }
+      });
+
+      if (diffDays > 5) {
+        toast.success('Aula criada com sucesso. Aparecerá quando faltarem 5 dias.');
+      } else {
+        toast.success('Aula criada');
+      }
+
+      setOpenCreate(false);
+      setForm({
+        sala_id: salas[0]?.id || '',
+        data: new Date().toISOString().split('T')[0],
+        hora: '10:00',
+        duracao: 60,
+        alunos: []
+      });
+
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao criar aula');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openCreateDialog = () => {
+    setForm({
+      sala_id: salas[0]?.id || '',
+      data: new Date().toISOString().split('T')[0],
+      hora: '10:00',
+      duracao: 60,
+      alunos: []
+    });
+    setOpenCreate(true);
+  };
 
   const toggle = (aulaId: string, alunoId: string) => {
     const ex = assiduidades.find(a => a.aula_id === aulaId && a.aluno_id === alunoId);
@@ -212,9 +365,12 @@ export default function ProfessorAulas() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Aulas</h1>
-        <p className="text-sm text-muted-foreground">Aulas dos próximos 5 dias e dos últimos 2 dias.</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Aulas</h1>
+          <p className="text-sm text-muted-foreground">Aulas dos próximos 5 dias e dos últimos 2 dias.</p>
+        </div>
+        <Button onClick={openCreateDialog}><Plus className="w-4 h-4 mr-2" />Nova Aula</Button>
       </div>
 
       {lista.length === 0 && (
@@ -444,6 +600,63 @@ export default function ProfessorAulas() {
               </div>
             )
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Class Dialog */}
+      <Dialog open={openCreate} onOpenChange={setOpenCreate}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Nova Aula</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>Sala</Label>
+              <Select value={form.sala_id} onValueChange={v => setForm({ ...form, sala_id: v })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione uma sala" />
+                </SelectTrigger>
+                <SelectContent>
+                  {salas.map(s => <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Duração (min)</Label>
+              <Input type="number" value={form.duracao} onChange={e => setForm({ ...form, duracao: +e.target.value })} />
+            </div>
+            <div>
+              <Label>Data</Label>
+              <Input type="date" value={form.data} onChange={e => setForm({ ...form, data: e.target.value })} />
+            </div>
+            <div>
+              <Label>Hora</Label>
+              <Input type="time" value={form.hora} onChange={e => setForm({ ...form, hora: e.target.value })} />
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <Label className="mb-2 block">Alunos</Label>
+            <div className="space-y-1 max-h-40 overflow-auto border rounded p-2">
+              {alunosAtivos.map(a => (
+                <label key={a.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox checked={form.alunos.includes(a.id)} onCheckedChange={() => toggleAluno(a.id)} />
+                  {a.nome}
+                </label>
+              ))}
+              {alunosAtivos.length === 0 && (
+                <p className="text-xs text-muted-foreground italic text-center p-2">Nenhum aluno ativo disponível.</p>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="mt-4">
+            <Button variant="ghost" onClick={() => setOpenCreate(false)} disabled={saving}>Cancelar</Button>
+            <Button onClick={handleCreateClass} disabled={saving}>
+              <CalendarDays className="w-4 h-4 mr-2" />
+              {saving ? 'A criar...' : 'Criar Aula'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
