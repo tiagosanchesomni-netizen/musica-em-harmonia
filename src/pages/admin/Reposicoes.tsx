@@ -66,7 +66,7 @@ export default function AdminReposicoes() {
           await supabase.functions.invoke('send-email', {
             body: {
               to: p.email,
-              subject: `✅ Aula reposta — ${dataNovaAula}`,
+              subject: `✅ Aula de reposição marcada — ${dataNovaAula}`,
               html: `
                 <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; background: #f9fafb; padding: 32px; border-radius: 12px;">
                   <div style="text-align: center; margin-bottom: 24px;">
