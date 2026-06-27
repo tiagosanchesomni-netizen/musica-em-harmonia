@@ -54,7 +54,17 @@ export default function AdminReposicoes() {
       destinatario_role: 'aluno' as Role,
       aluno_id: alunoId,
     }));
-    setNotificacoes(prev => [...alunoNotifs, ...prev]);
+
+    const adminNotif = {
+      id: `n-rep-adm-act-${Date.now()}`,
+      mensagem: `Foi marcada uma reposição para ${formatDataHora(data_hora)}.`,
+      lida: false,
+      tipo: 'reposicao_marcada' as const,
+      criado_em: new Date().toISOString(),
+      destinatario_role: 'admin' as Role,
+    };
+
+    setNotificacoes(prev => [adminNotif, ...alunoNotifs, ...prev]);
 
     // Enviar emails reais via Resend/Brevo para cada aluno
     const dataAulaAntiga = `${formatData(editing.data_hora)} às ${formatHora(editing.data_hora)}`;

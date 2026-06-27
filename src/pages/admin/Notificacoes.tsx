@@ -17,7 +17,7 @@ export default function AdminNotificacoes() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Notificações</h1>
-          <p className="text-sm text-muted-foreground">Alertas de cancelamentos e presenças em atraso.</p>
+          <p className="text-sm text-muted-foreground">Alertas de cancelamentos, presenças em atraso e reposições.</p>
         </div>
         <Button variant="outline" onClick={markAll}><Check className="w-4 h-4 mr-2" />Marcar todas como lidas</Button>
       </div>
@@ -28,8 +28,20 @@ export default function AdminNotificacoes() {
         )}
         {lista.map(n => (
           <Card key={n.id} className={`p-4 flex items-start gap-3 ${n.lida ? 'opacity-60' : ''}`}>
-            <div className={`p-2 rounded-md ${n.tipo === 'cancelamento' ? 'bg-status-canceled/10 text-status-canceled' : 'bg-status-absent/10 text-status-absent'}`}>
-              {n.tipo === 'cancelamento' ? <X className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
+            <div className={`p-2 rounded-md ${
+              n.tipo === 'cancelamento'
+                ? 'bg-status-canceled/10 text-status-canceled'
+                : n.tipo === 'reposicao_marcada'
+                ? 'bg-green-500/10 text-green-600'
+                : 'bg-status-absent/10 text-status-absent'
+            }`}>
+              {n.tipo === 'cancelamento' ? (
+                <X className="w-4 h-4" />
+              ) : n.tipo === 'reposicao_marcada' ? (
+                <Check className="w-4 h-4" />
+              ) : (
+                <AlertTriangle className="w-4 h-4" />
+              )}
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2">
