@@ -69,6 +69,41 @@ export default function AdminReposicoes() {
     // Enviar emails reais via Resend/Brevo para cada aluno
     const dataAulaAntiga = `${formatData(editing.data_hora)} às ${formatHora(editing.data_hora)}`;
     const dataNovaAula = `${formatData(data_hora)} às ${formatHora(data_hora)}`;
+    
+    // Enviar cópia de reposição para todos os administradores
+    const adminEmails = profiles.filter(pr => pr.role === 'admin' && pr.email).map(pr => pr.email);
+    adminEmails.forEach(async (adminEmail) => {
+      try {
+        await supabase.functions.invoke('send-email', {
+          body: {
+            to: adminEmail,
+            subject: `✅ [ADMIN] Aula de reposição marcada — ${dataNovaAula}`,
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; background: #f9fafb; padding: 32px; border-radius: 12px;">
+                <div style="text-align: center; margin-bottom: 24px;">
+                  <h1 style="color: #1e1b4b; font-size: 22px; margin: 0;">🎵 Escola de Música GRT</h1>
+                  <p style="color: #6b7280; margin: 8px 0 0;">Cópia de Reposição de Aula</p>
+                </div>
+                <div style="background: white; border-radius: 8px; padding: 24px; border: 1px solid #e5e7eb;">
+                  <p style="color: #047857; font-weight: bold; margin: 0 0 12px;">✅ Aula de Reposição Agendada</p>
+                  <p style="color: #374151; margin: 0 0 8px;">Uma aula de reposição foi marcada:</p>
+                  <ul style="color: #374151; margin: 0 0 16px; padding-left: 20px;">
+                    <li><strong>Aula Cancelada:</strong> ${dataAulaAntiga}</li>
+                    <li><strong>Nova Data/Hora:</strong> ${dataNovaAula}</li>
+                    <li><strong>Professor(es):</strong> ${editing.professores.map(pId => getProfile(pId)?.nome).join(', ')}</li>
+                    <li><strong>Alunos:</strong> ${editing.alunos.map(aId => getProfile(aId)?.nome).join(', ')}</li>
+                  </ul>
+                </div>
+                <p style="color: #9ca3af; font-size: 12px; text-align: center; margin-top: 24px;">Escola de Música GRT — Sistema de Gestão</p>
+              </div>
+            `,
+          },
+        });
+      } catch (err) {
+        console.error('Erro ao enviar cópia de reposição para admin:', err);
+      }
+    });
+
     editing.alunos.forEach(async (alunoId) => {
       const p = getProfile(alunoId);
       if (p?.email) {

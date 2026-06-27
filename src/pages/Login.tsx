@@ -14,9 +14,11 @@ import logoGrt from '@/assets/logo-grt.jpg';
 // ──────────────────────────────────────────────────
 type Screen =
   | 'login'             // ecrã inicial: email/nome + password
-  | 'fa_key'            // primeiro acesso – passo 1: nome + chave provisória
   | 'fa_setup'          // primeiro acesso – passo 2: novo email + nova password
-  | 'fa_verify';        // primeiro acesso – passo 3: código de verificação
+  | 'fa_verify'         // primeiro acesso – passo 3: código de verificação
+  | 'forgot_email'      // recuperar palavra-passe – passo 1: introduzir email
+  | 'forgot_verify'     // recuperar palavra-passe – passo 2: introduzir código
+  | 'forgot_reset';     // recuperar palavra-passe – passo 3: nova palavra-passe
 
 export default function Login() {
   const navigate = useNavigate();
@@ -41,6 +43,14 @@ export default function Login() {
   const [faGeneratedCode, setFaGeneratedCode] = useState('');
   const [faEmailSent, setFaEmailSent] = useState(false);
 
+  // ── Esqueci-me da palavra-passe ───────────────
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotCode, setForgotCode] = useState('');
+  const [forgotGeneratedCode, setForgotGeneratedCode] = useState('');
+  const [forgotEmailSent, setForgotEmailSent] = useState(false);
+  const [forgotPassword, setForgotPassword] = useState('');
+  const [forgotConfirm, setForgotConfirm] = useState('');
+
   // ── Password strength helpers ─────────────────
   const hasMinLength = faPassword.length >= 8;
   const hasUpper = /[A-Z]/.test(faPassword);
@@ -49,6 +59,14 @@ export default function Login() {
   const hasSpecial = /[^A-Za-z0-9]/.test(faPassword);
   const isPasswordStrong = hasMinLength && hasUpper && hasLower && hasNumber && hasSpecial;
   const passwordsMatch = faPassword === faConfirm;
+
+  const forgotMinLength = forgotPassword.length >= 8;
+  const forgotUpper = /[A-Z]/.test(forgotPassword);
+  const forgotLower = /[a-z]/.test(forgotPassword);
+  const forgotNumber = /[0-9]/.test(forgotPassword);
+  const forgotSpecial = /[^A-Za-z0-9]/.test(forgotPassword);
+  const isForgotPassStrong = forgotMinLength && forgotUpper && forgotLower && forgotNumber && forgotSpecial;
+  const forgotPasswordsMatch = forgotPassword === forgotConfirm;
   const isEmailValid = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 
   // ── Handlers ─────────────────────────────────
@@ -87,19 +105,27 @@ export default function Login() {
         return;
       }
 
-      toast.success('Sessão iniciada!');
       const { data: prof } = await supabase
         .from('app_profiles')
-        .select('role')
+        .select('role, primeiro_acesso, nome, email')
         .eq('auth_user_id', data.user.id)
         .single();
 
-      const roleHome: Record<string, string> = {
-        admin: '/admin/aulas',
-        professor: '/professor/aulas',
-        aluno: '/aluno/aulas',
-      };
-      navigate(roleHome[prof?.role ?? ''] || '/');
+      if (prof?.primeiro_acesso) {
+        setFaName(prof.nome || '');
+        setFaEmail(prof.email || '');
+        setFaKey(password);
+        setScreen('fa_setup');
+        toast.info('Primeiro acesso detetado. Por favor, configure a sua conta.');
+      } else {
+        toast.success('Sessão iniciada!');
+        const roleHome: Record<string, string> = {
+          admin: '/admin/aulas',
+          professor: '/professor/aulas',
+          aluno: '/aluno/aulas',
+        };
+        navigate(roleHome[prof?.role ?? ''] || '/');
+      }
     } catch (err: any) {
       toast.error(err.message || 'Erro ao iniciar sessão');
     } finally {
@@ -256,12 +282,136 @@ export default function Login() {
     }
   };
 
+  // 5. Esqueci-me da password - enviar email com código
+  const handleForgotEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmail || !isEmailValid(forgotEmail)) {
+      toast.error('Introduza um email válido');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // Verificar se o email existe na base de dados chamando a Edge Function (desvia o bloqueio de RLS para anon)
+      const { data: checkData, error: checkErr } = await supabase.functions.invoke('check-email', {
+        body: { email: forgotEmail.trim() },
+      });
+
+      if (checkErr || !checkData || !checkData.exists) {
+        if (checkErr) console.error('Erro ao verificar email:', checkErr);
+        toast.error('Email não encontrado no sistema');
+        setIsLoading(false);
+        return;
+      }
+
+      // Utilizar a capitalização exata registada na base de dados
+      if (checkData.email) {
+        setForgotEmail(checkData.email);
+      }
+
+      // Gerar código de 6 dígitos
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      setForgotGeneratedCode(code);
+
+      let emailSent = false;
+      try {
+        const { error: invokeErr } = await supabase.functions.invoke('send-email', {
+          body: {
+            to: forgotEmail.trim(),
+            subject: '🔑 Recuperar Palavra-passe — Código de Verificação',
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; background: #f9fafb; padding: 32px; border-radius: 12px;">
+                <div style="text-align: center; margin-bottom: 24px;">
+                  <h1 style="color: #1e1b4b; font-size: 22px; margin: 0;">🎵 Escola de Música GRT</h1>
+                  <p style="color: #6b7280; margin: 8px 0 0;">Recuperação de Palavra-passe</p>
+                </div>
+                <div style="background: white; border-radius: 8px; padding: 24px; border: 1px solid #e5e7eb;">
+                  <p style="color: #374151; margin: 0 0 16px;">Recebemos um pedido para recuperar a palavra-passe da sua conta. Utilize o seguinte código para prosseguir:</p>
+                  <div style="background: #f3f4f6; border-radius: 8px; padding: 16px; text-align: center; margin-bottom: 16px;">
+                    <code style="font-size: 24px; font-weight: bold; letter-spacing: 4px; color: #111827;">${code}</code>
+                  </div>
+                  <p style="color: #6b7280; font-size: 13px; margin: 0;">Se não efetuou este pedido, pode ignorar este email de forma segura.</p>
+                </div>
+                <p style="color: #9ca3af; font-size: 12px; text-align: center; margin-top: 24px;">Escola de Música GRT — Sistema de Gestão</p>
+              </div>
+            `,
+          },
+        });
+        if (!invokeErr) {
+          emailSent = true;
+          toast.success(`Código enviado para ${forgotEmail} — verifique a sua caixa de entrada`);
+        }
+      } catch {
+        // network error
+      }
+
+      if (!emailSent) {
+        toast.warning('Não foi possível enviar o email. Use o código mostrado abaixo.');
+      }
+
+      setForgotEmailSent(emailSent);
+      setScreen('forgot_verify');
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao processar pedido');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 6. Esqueci-me da password - verificar código
+  const handleForgotVerify = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (forgotCode !== forgotGeneratedCode) {
+      toast.error('Código de validação incorreto. Tente novamente.');
+      return;
+    }
+    setScreen('forgot_reset');
+  };
+
+  // 7. Esqueci-me da password - definir nova password
+  const handleForgotReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isForgotPassStrong) {
+      toast.error('A palavra-passe não cumpre todos os requisitos de segurança');
+      return;
+    }
+    if (!forgotPasswordsMatch) {
+      toast.error('As palavras-passe não coincidem');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('reset-password-with-code', {
+        body: { email: forgotEmail, new_password: forgotPassword },
+      });
+
+      if (error || data?.error) {
+        throw new Error(error?.message || data?.error || 'Erro ao redefinir palavra-passe');
+      }
+
+      toast.success('Palavra-passe redefinida com sucesso! Inicie sessão.');
+      
+      // Limpar estados
+      setForgotEmail(''); setForgotCode(''); setForgotGeneratedCode('');
+      setForgotPassword(''); setForgotConfirm('');
+      setScreen('login');
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao redefinir palavra-passe');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // ── Rótulos por ecrã ─────────────────────────
   const screenTitle: Record<Screen, string> = {
     login: 'Escola de Música GRT',
     fa_key: 'Primeiro Acesso',
     fa_setup: 'Configurar Conta',
     fa_verify: 'Verificar Email',
+    forgot_email: 'Recuperar Palavra-passe',
+    forgot_verify: 'Introduzir Código',
+    forgot_reset: 'Nova Palavra-passe',
   };
 
   const screenDesc: Record<Screen, string> = {
@@ -269,14 +419,17 @@ export default function Login() {
     fa_key: 'Introduza o seu nome e a chave provisória que recebeu',
     fa_setup: 'Defina o seu email e palavra-passe definitivos',
     fa_verify: 'Introduza o código enviado para o seu email',
+    forgot_email: 'Insira o email associado à sua conta',
+    forgot_verify: 'Introduza o código enviado por email',
+    forgot_reset: 'Escolha e confirme a sua nova palavra-passe',
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-4">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent pointer-events-none" />
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[hsl(148,50%,12%)] via-[hsl(148,45%,8%)] to-[hsl(148,60%,5%)] p-4">
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-[hsl(145,60%,42%)]/10 via-transparent to-transparent pointer-events-none" />
 
       <Card className="w-full max-w-[420px] backdrop-blur-md bg-card/90 border-slate-800 shadow-2xl relative overflow-hidden">
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary via-purple-500 to-indigo-500" />
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[hsl(145,60%,42%)] via-emerald-500 to-green-600" />
 
         <CardHeader className="space-y-3 flex flex-col items-center text-center">
           <div className="w-16 h-16 rounded-2xl overflow-hidden bg-white shadow-lg p-0.5 border border-slate-700/50">
@@ -328,47 +481,8 @@ export default function Login() {
                 </div>
               </div>
 
-              <Button type="submit" className="w-full mt-2 font-semibold" disabled={isLoading}>
+              <Button type="submit" className="w-full mt-2 font-semibold bg-[hsl(145,60%,42%)] hover:bg-[hsl(145,60%,36%)] text-white" disabled={isLoading}>
                 {isLoading ? 'A carregar...' : 'Iniciar Sessão'}
-              </Button>
-            </form>
-          )}
-
-          {/* ── Ecrã: Primeiro acesso – passo 1 (chave) ── */}
-          {screen === 'fa_key' && (
-            <form onSubmit={handleFaKey} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="faName">Nome Completo</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="faName"
-                    placeholder="ex: Rui Almeida"
-                    className="pl-10"
-                    value={faName}
-                    onChange={(e) => setFaName(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="faKey">Chave Provisória</Label>
-                <div className="relative">
-                  <ShieldCheck className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="faKey"
-                    placeholder="Introduza a chave provisória"
-                    className="pl-10 uppercase font-mono tracking-wider"
-                    value={faKey}
-                    onChange={(e) => setFaKey(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-
-              <Button type="submit" className="w-full font-semibold bg-purple-600 hover:bg-purple-700 text-white" disabled={isLoading}>
-                {isLoading ? 'A validar...' : 'Validar Chave'}
               </Button>
             </form>
           )}
@@ -439,7 +553,7 @@ export default function Login() {
                 )}
               </div>
 
-              <Button type="submit" className="w-full font-semibold bg-purple-600 hover:bg-purple-700 text-white">
+              <Button type="submit" className="w-full font-semibold bg-[hsl(145,60%,42%)] hover:bg-[hsl(145,60%,36%)] text-white">
                 Continuar para verificação
               </Button>
             </form>
@@ -481,8 +595,133 @@ export default function Login() {
                 )}
               </div>
 
-              <Button type="submit" className="w-full font-semibold bg-purple-600 hover:bg-purple-700 text-white" disabled={isLoading}>
+              <Button type="submit" className="w-full font-semibold bg-[hsl(145,60%,42%)] hover:bg-[hsl(145,60%,36%)] text-white" disabled={isLoading}>
                 {isLoading ? 'A ativar...' : 'Validar e Ativar Conta'}
+              </Button>
+            </form>
+          )}
+
+          {/* ── Ecrã: Esqueci-me da palavra-passe – passo 1 (email) ── */}
+          {screen === 'forgot_email' && (
+            <form onSubmit={handleForgotEmail} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="forgotEmail">Email da Conta</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="forgotEmail"
+                    type="email"
+                    placeholder="exemplo@email.com"
+                    className="pl-10"
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <Button type="submit" className="w-full font-semibold bg-[hsl(145,60%,42%)] hover:bg-[hsl(145,60%,36%)] text-white" disabled={isLoading}>
+                {isLoading ? 'A processar...' : 'Enviar Código'}
+              </Button>
+            </form>
+          )}
+
+          {/* ── Ecrã: Esqueci-me da palavra-passe – passo 2 (verificação) ── */}
+          {screen === 'forgot_verify' && (
+            <form onSubmit={handleForgotVerify} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="forgotCode">Código de Verificação</Label>
+                <Input
+                  id="forgotCode"
+                  type="text"
+                  maxLength={6}
+                  placeholder="000000"
+                  className="text-center text-xl tracking-widest font-mono font-bold"
+                  value={forgotCode}
+                  onChange={(e) => setForgotCode(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg text-xs">
+                {forgotEmailSent ? (
+                  <>
+                    <p className="font-semibold text-primary">📧 Código enviado por email</p>
+                    <p className="text-muted-foreground mt-1">
+                      Verifique a caixa de entrada de <strong className="text-foreground">{forgotEmail}</strong> e introduza o código de 6 dígitos recebido.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-semibold text-amber-500">⚠️ Email não enviado — use o código abaixo</p>
+                    <p className="text-muted-foreground mt-1">O envio de email falhou. Utilize este código temporário de simulação:</p>
+                    <code className="block p-2 bg-background border rounded font-mono text-center text-lg text-foreground font-bold mt-2 tracking-widest">
+                      {forgotGeneratedCode}
+                    </code>
+                  </>
+                )}
+              </div>
+
+              <Button type="submit" className="w-full font-semibold bg-[hsl(145,60%,42%)] hover:bg-[hsl(145,60%,36%)] text-white">
+                Validar Código
+              </Button>
+            </form>
+          )}
+
+          {/* ── Ecrã: Esqueci-me da palavra-passe – passo 3 (nova password) ── */}
+          {screen === 'forgot_reset' && (
+            <form onSubmit={handleForgotReset} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="forgotPassword">Nova Palavra-passe</Label>
+                <Input
+                  id="forgotPassword"
+                  type="password"
+                  placeholder="••••••••"
+                  value={forgotPassword}
+                  onChange={(e) => setForgotPassword(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="forgotConfirm">Confirmar Nova Palavra-passe</Label>
+                <Input
+                  id="forgotConfirm"
+                  type="password"
+                  placeholder="••••••••"
+                  value={forgotConfirm}
+                  onChange={(e) => setForgotConfirm(e.target.value)}
+                  required
+                />
+              </div>
+
+              {/* Requisitos */}
+              <div className="p-3 bg-muted/40 rounded-lg space-y-1.5 text-xs">
+                <p className="font-semibold text-muted-foreground">Requisitos da palavra-passe:</p>
+                {[
+                  [forgotMinLength, 'Mínimo 8 caracteres'],
+                  [forgotUpper, 'Uma maiúscula'],
+                  [forgotLower, 'Uma minúscula'],
+                  [forgotNumber, 'Um número'],
+                  [forgotSpecial, 'Um caractere especial (@, #, $, !)'],
+                ].map(([ok, label]) => (
+                  <div key={label as string} className="flex items-center gap-1.5">
+                    {ok ? <Check className="w-3.5 h-3.5 text-green-500 shrink-0" /> : <X className="w-3.5 h-3.5 text-destructive shrink-0" />}
+                    <span className={(ok as boolean) ? 'text-green-600 font-medium' : 'text-muted-foreground'}>{label as string}</span>
+                  </div>
+                ))}
+                {forgotPassword && forgotConfirm && (
+                  <div className="flex items-center gap-1.5 pt-1 border-t">
+                    {forgotPasswordsMatch ? <Check className="w-3.5 h-3.5 text-green-500" /> : <X className="w-3.5 h-3.5 text-destructive" />}
+                    <span className={forgotPasswordsMatch ? 'text-green-600 font-medium' : 'text-destructive font-medium'}>
+                      {forgotPasswordsMatch ? 'As palavras-passe coincidem' : 'As palavras-passe não coincidem'}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <Button type="submit" className="w-full font-semibold bg-[hsl(145,60%,42%)] hover:bg-[hsl(145,60%,36%)] text-white" disabled={isLoading}>
+                {isLoading ? 'A redefinir...' : 'Redefinir Palavra-passe'}
               </Button>
             </form>
           )}
@@ -494,9 +733,9 @@ export default function Login() {
             <Button
               variant="link"
               className="text-xs text-muted-foreground hover:text-foreground"
-              onClick={() => setScreen('fa_key')}
+              onClick={() => setScreen('forgot_email')}
             >
-              É o seu primeiro acesso? Clique aqui
+              Esqueci-me da minha palavra-passe
             </Button>
           )}
           {screen !== 'login' && (
@@ -504,11 +743,12 @@ export default function Login() {
               variant="link"
               className="text-xs text-muted-foreground hover:text-foreground"
               onClick={async () => {
-                // Se já fez login provisório, fazer logout antes de voltar
                 await supabase.auth.signOut();
                 setScreen('login');
                 setFaName(''); setFaKey(''); setFaEmail('');
                 setFaPassword(''); setFaConfirm(''); setFaCode('');
+                setForgotEmail(''); setForgotCode(''); setForgotGeneratedCode('');
+                setForgotPassword(''); setForgotConfirm('');
               }}
             >
               ← Voltar para Iniciar Sessão

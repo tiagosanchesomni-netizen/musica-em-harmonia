@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { useApp } from '@/contexts/AppContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Aula, Documento } from '@/data/mockData';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +23,7 @@ export default function ProfessorAulas() {
   
   const lista = filtroProfessor(aulas, currentUserId);
   const [selected, setSelected] = useState<Aula | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<any | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // States for folder selection and creation
@@ -132,22 +134,80 @@ export default function ProfessorAulas() {
     setFolderCreateOpen(false);
   };
 
-  const upload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const upload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; if (!f || !selected) return;
     const pastaId = selectedFolderId === 'none' ? undefined : selectedFolderId;
-    const novo: Documento = {
-      id: 'd' + Date.now(), 
-      nome: f.name, 
-      url: '#',
-      pasta_id: pastaId,
-      aula_id: selected.id, 
-      criado_por: currentUserId, 
-      criado_em: new Date().toISOString(),
-      acesso_alunos: [...selected.alunos],
-    };
-    setDocumentos(prev => [novo, ...prev]);
-    toast.success('Documento carregado e associado à aula');
-    e.target.value = '';
+    
+    toast.loading('A preparar envio...', { id: 'upload-toast' });
+    try {
+      // 1. Obter o URL assinado do Cloudflare R2 via Edge Function
+      const { data: signData, error: signErr } = await supabase.functions.invoke('get-presigned-url', {
+        body: { filename: f.name, contentType: f.type },
+      });
+
+      let finalUrl = '#';
+
+      if (!signErr && signData && signData.uploadUrl && !signData.fallback) {
+        // 2. Upload direto via PUT para o URL assinado
+        toast.loading('A enviar ficheiro para o armazenamento...', { id: 'upload-toast' });
+        const uploadRes = await fetch(signData.uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': f.type },
+          body: f,
+        });
+
+        if (!uploadRes.ok) {
+          throw new Error('Falha ao carregar ficheiro para o Cloudflare R2');
+        }
+
+        finalUrl = signData.fileUrl;
+      } else {
+        // Fallback local se o R2 não estiver configurado
+        console.warn('R2 não configurado ou erro no backend. Utilizando simulação local.');
+        finalUrl = URL.createObjectURL(f);
+      }
+
+      const novo: Documento = {
+        id: 'd' + Date.now(), 
+        nome: f.name, 
+        url: finalUrl,
+        pasta_id: pastaId,
+        aula_id: selected.id, 
+        criado_por: currentUserId, 
+        criado_em: new Date().toISOString(),
+        acesso_alunos: [...selected.alunos],
+      };
+      setDocumentos(prev => [novo, ...prev]);
+      toast.success('Documento carregado e associado à aula com sucesso!', { id: 'upload-toast' });
+    } catch (err: any) {
+      console.error(err);
+      toast.error('Erro ao efetuar upload do ficheiro: ' + err.message, { id: 'upload-toast' });
+    } finally {
+      e.target.value = '';
+    }
+  };
+
+  const handleDownload = async (url: string, filename: string) => {
+    if (url === '#' || !url) return;
+    toast.loading('A descarregar ficheiro...', { id: 'download-toast' });
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Falha ao descarregar ficheiro do armazenamento');
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+      toast.success('Download concluído!', { id: 'download-toast' });
+    } catch (err: any) {
+      console.error(err);
+      toast.error('Erro ao efetuar download: ' + err.message, { id: 'download-toast' });
+    }
   };
 
   return (
@@ -192,114 +252,198 @@ export default function ProfessorAulas() {
         })}
       </div>
 
-      <Dialog open={!!selected} onOpenChange={o => !o && setSelected(null)}>
-        <DialogContent className="max-w-lg">
+      <Dialog open={!!selected} onOpenChange={o => { if (!o) { setSelected(null); setPreviewDoc(null); } }}>
+        <DialogContent className={previewDoc ? "max-w-4xl w-[90vw]" : "max-w-lg"}>
           <DialogHeader>
-            <DialogTitle>Aula • {selected && formatDataHora(selected.data_hora)}</DialogTitle>
+            <DialogTitle>
+              {previewDoc ? `Pré-visualização • ${previewDoc.nome}` : `Aula • ${selected && formatDataHora(selected.data_hora)}`}
+            </DialogTitle>
           </DialogHeader>
-          {selected && (
+
+          {previewDoc ? (
             <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">{getSala(selected.sala_id)?.nome} • {selected.duracao} min</p>
+              <div className="mt-2">
+                {(() => {
+                  const name = previewDoc.nome.toLowerCase().trim();
+                  const ext = name.split('.').pop() || '';
+                  const isPdf = ext === 'pdf';
+                  const isText = ext === 'txt';
+                  const isVideo = ['mp4', 'webm', 'ogg', 'mov'].includes(ext);
+                  const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext);
 
-              <div>
-                <h3 className="font-semibold text-sm mb-2">Presenças</h3>
-                <div className="space-y-2 border rounded p-3">
-                  {selected.alunos.map(alunoId => {
-                    const al = getProfile(alunoId);
-                    const ass = assiduidades.find(a => a.aula_id === selected.id && a.aluno_id === alunoId);
+                  if (!previewDoc.url || previewDoc.url === '#') {
                     return (
-                      <label key={alunoId} className="flex items-center gap-2 cursor-pointer">
-                        <Checkbox checked={!!ass?.presente} onCheckedChange={() => toggle(selected.id, alunoId)} />
-                        <span>{al?.nome}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div>
-                <h3 className="font-semibold text-sm mb-2">Documentos da aula</h3>
-                <div className="space-y-1 mb-3">
-                  {documentos.filter(d => d.aula_id === selected.id).map(d => {
-                    const pasta = pastas.find(p => p.id === d.pasta_id);
-                    return (
-                      <div key={d.id} className="text-sm flex items-center justify-between bg-muted/40 p-2 rounded border">
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <FileText className="w-4 h-4 text-primary shrink-0" />
-                          <span className="truncate flex-1">{d.nome}</span>
-                          {pasta && (
-                            <Badge variant="secondary" className="text-[10px] py-0 px-1.5 shrink-0 bg-primary/10 text-primary border border-primary/20">
-                              {pasta.nome}
-                            </Badge>
-                          )}
-                        </div>
+                      <div className="text-center p-8 space-y-4 border border-dashed rounded bg-muted/10">
+                        <FileText className="w-16 h-16 text-muted-foreground mx-auto animate-pulse" />
+                        <p className="text-sm font-medium text-destructive">O ficheiro ainda não foi carregado corretamente no armazenamento.</p>
                       </div>
                     );
-                  })}
-                  {documentos.filter(d => d.aula_id === selected.id).length === 0 && (
-                    <p className="text-xs text-muted-foreground italic p-2 border border-dashed rounded text-center">Nenhum documento associado a esta aula.</p>
-                  )}
+                  }
+
+                  if (isPdf || isText) {
+                    return (
+                      <div className="text-center p-8 space-y-4 border border-dashed rounded bg-muted/10">
+                        <FileText className="w-16 h-16 text-primary mx-auto" />
+                        <div>
+                          <p className="text-sm font-medium">Documento ({ext.toUpperCase()}) pronto para visualização</p>
+                          <p className="text-xs text-muted-foreground mt-1">Para abrir e ler este documento de forma ideal, clique no botão abaixo.</p>
+                        </div>
+                        <Button asChild size="sm">
+                          <a href={previewDoc.url} target="_blank" rel="noopener noreferrer">
+                            Abrir Documento numa nova aba
+                          </a>
+                        </Button>
+                      </div>
+                    );
+                  }
+                  if (isVideo) {
+                    return (
+                      <video 
+                        src={previewDoc.url} 
+                        controls 
+                        className="w-full max-h-[60vh] rounded border bg-black" 
+                      />
+                    );
+                  }
+                  if (isImage) {
+                    return (
+                      <div className="flex justify-center p-2 bg-muted/20 border rounded">
+                        <img 
+                          src={previewDoc.url} 
+                          alt={previewDoc.nome} 
+                          className="max-w-full max-h-[60vh] object-contain rounded" 
+                        />
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="text-center p-8 space-y-4 border border-dashed rounded bg-muted/10">
+                      <FileText className="w-16 h-16 text-muted-foreground mx-auto" />
+                      <div>
+                        <p className="text-sm font-medium">Pré-visualização indisponível para este tipo de ficheiro.</p>
+                        <p className="text-xs text-muted-foreground mt-1">Pode efetuar o download para abrir no seu dispositivo.</p>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+              <DialogFooter className="flex items-center justify-between sm:justify-between gap-2 border-t pt-3">
+                <Button size="sm" variant="outline" onClick={() => setPreviewDoc(null)}>← Voltar para a Aula</Button>
+                <Button size="sm" onClick={() => handleDownload(previewDoc.url, previewDoc.nome)}>
+                  Descarregar Ficheiro
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            selected && (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">{getSala(selected.sala_id)?.nome} • {selected.duracao} min</p>
+
+                <div>
+                  <h3 className="font-semibold text-sm mb-2">Presenças</h3>
+                  <div className="space-y-2 border rounded p-3">
+                    {selected.alunos.map(alunoId => {
+                      const al = getProfile(alunoId);
+                      const ass = assiduidades.find(a => a.aula_id === selected.id && a.aluno_id === alunoId);
+                      return (
+                        <label key={alunoId} className="flex items-center gap-2 cursor-pointer">
+                          <Checkbox checked={!!ass?.presente} onCheckedChange={() => toggle(selected.id, alunoId)} />
+                          <span>{al?.nome}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                <div className="space-y-3 mt-4 border-t pt-3">
-                  <h4 className="text-xs font-semibold text-muted-foreground">Importar Ficheiro:</h4>
-                  
-                  {/* Folder Selection and Creation Row */}
-                  <div className="flex gap-2 items-end">
-                    <div className="flex-1 space-y-1">
-                      <Label htmlFor="upload-folder" className="text-[11px] text-muted-foreground">Pasta de Destino (Opcional)</Label>
-                      <Select value={selectedFolderId} onValueChange={setSelectedFolderId}>
-                        <SelectTrigger id="upload-folder" className="h-9 text-xs">
-                          <SelectValue placeholder="Sem pasta (Ficheiro avulso)" />
-                        </SelectTrigger>
-                        <SelectContent className="text-xs">
-                          <SelectItem value="none">Sem pasta (Ficheiro avulso)</SelectItem>
-                          {pastas.filter(p => p.criado_por === currentUserId).map(p => (
-                            <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <Dialog open={folderCreateOpen} onOpenChange={setFolderCreateOpen}>
-                      <DialogTrigger asChild>
-                        <Button size="sm" variant="outline" className="h-9 px-3" title="Criar Nova Pasta">
-                          <FolderPlus className="w-4 h-4 mr-1" /> Nova Pasta
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="sm:max-w-[400px]">
-                        <DialogHeader>
-                          <DialogTitle>Criar Nova Pasta</DialogTitle>
-                        </DialogHeader>
-                        <div className="space-y-3 py-2">
-                          <div className="space-y-1">
-                            <Label htmlFor="folder-name">Nome da Pasta</Label>
-                            <Input 
-                              id="folder-name" 
-                              placeholder="Ex: Partituras, Teoria..."
-                              value={newFolderName}
-                              onChange={e => setNewFolderName(e.target.value)}
-                            />
+                <div>
+                  <h3 className="font-semibold text-sm mb-2">Documentos da aula</h3>
+                  <div className="space-y-1 mb-3">
+                    {documentos.filter(d => d.aula_id === selected.id).map(d => {
+                      const pasta = pastas.find(p => p.id === d.pasta_id);
+                      return (
+                        <div key={d.id} className="text-sm flex items-center justify-between bg-muted/40 p-2 rounded border">
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <FileText className="w-4 h-4 text-primary shrink-0" />
+                            <span 
+                              className="truncate flex-1 hover:underline cursor-pointer text-primary font-medium" 
+                              onClick={() => setPreviewDoc(d)}
+                              title="Clique para pré-visualizar"
+                            >
+                              {d.nome}
+                            </span>
+                            {pasta && (
+                              <Badge variant="secondary" className="text-[10px] py-0 px-1.5 shrink-0 bg-primary/10 text-primary border border-primary/20">
+                                {pasta.nome}
+                              </Badge>
+                            )}
                           </div>
                         </div>
-                        <DialogFooter>
-                          <Button size="sm" variant="outline" onClick={() => setFolderCreateOpen(false)}>Cancelar</Button>
-                          <Button size="sm" onClick={handleCreateFolder}>Criar</Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
+                      );
+                    })}
+                    {documentos.filter(d => d.aula_id === selected.id).length === 0 && (
+                      <p className="text-xs text-muted-foreground italic p-2 border border-dashed rounded text-center">Nenhum documento associado a esta aula.</p>
+                    )}
                   </div>
 
-                  <Button size="sm" className="w-full mt-2" variant="outline" onClick={() => inputRef.current?.click()}><Upload className="w-4 h-4 mr-2" />Escolher e Enviar Ficheiro</Button>
-                  <input ref={inputRef} type="file" hidden onChange={upload} />
+                  <div className="space-y-3 mt-4 border-t pt-3">
+                    <h4 className="text-xs font-semibold text-muted-foreground">Importar Ficheiro:</h4>
+                    
+                    <div className="flex gap-2 items-end">
+                      <div className="flex-1 space-y-1">
+                        <Label htmlFor="upload-folder" className="text-[11px] text-muted-foreground">Pasta de Destino (Opcional)</Label>
+                        <Select value={selectedFolderId} onValueChange={setSelectedFolderId}>
+                          <SelectTrigger id="upload-folder" className="h-9 text-xs">
+                            <SelectValue placeholder="Sem pasta (Ficheiro avulso)" />
+                          </SelectTrigger>
+                          <SelectContent className="text-xs">
+                            <SelectItem value="none">Sem pasta (Ficheiro avulso)</SelectItem>
+                            {pastas.filter(p => p.criado_por === currentUserId).map(p => (
+                              <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <Dialog open={folderCreateOpen} onOpenChange={setFolderCreateOpen}>
+                        <DialogTrigger asChild>
+                          <Button size="sm" variant="outline" className="h-9 px-3" title="Criar Nova Pasta">
+                            <FolderPlus className="w-4 h-4 mr-1" /> Nova Pasta
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[400px]">
+                          <DialogHeader>
+                            <DialogTitle>Criar Nova Pasta</DialogTitle>
+                          </DialogHeader>
+                          <div className="space-y-3 py-2">
+                            <div className="space-y-1">
+                              <Label htmlFor="folder-name">Nome da Pasta</Label>
+                              <Input 
+                                id="folder-name" 
+                                placeholder="Ex: Partituras, Teoria..."
+                                value={newFolderName}
+                                onChange={e => setNewFolderName(e.target.value)}
+                              />
+                            </div>
+                          </div>
+                          <DialogFooter>
+                            <Button size="sm" variant="outline" onClick={() => setFolderCreateOpen(false)}>Cancelar</Button>
+                            <Button size="sm" onClick={handleCreateFolder}>Criar</Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+
+                    <Button size="sm" className="w-full mt-2" variant="outline" onClick={() => inputRef.current?.click()}><Upload className="w-4 h-4 mr-2" />Escolher e Enviar Ficheiro</Button>
+                    <input ref={inputRef} type="file" hidden onChange={upload} />
+                  </div>
                 </div>
+                <DialogFooter className="gap-2 pt-2 border-t mt-2">
+                  <Button variant="destructive" onClick={cancelar}><X className="w-4 h-4 mr-2" />Cancelar Aula</Button>
+                  <Button onClick={finalizar}><Check className="w-4 h-4 mr-2" />Guardar e Finalizar</Button>
+                </DialogFooter>
               </div>
-            </div>
+            )
           )}
-          <DialogFooter className="gap-2 pt-2 border-t mt-2">
-            <Button variant="destructive" onClick={cancelar}><X className="w-4 h-4 mr-2" />Cancelar Aula</Button>
-            <Button onClick={finalizar}><Check className="w-4 h-4 mr-2" />Guardar e Finalizar</Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

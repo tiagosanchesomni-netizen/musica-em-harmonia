@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { useApp } from '@/contexts/AppContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Documento, Pasta, AcessoAlunos } from '@/data/mockData';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,6 +31,7 @@ export default function ProfessorDocumentos() {
 
   const [openDoc, setOpenDoc] = useState(false);
   const [docForm, setDocForm] = useState<{ pasta_id?: string; todos: boolean; ids: string[] }>({ todos: true, ids: [] });
+  const [previewDoc, setPreviewDoc] = useState<any | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const criarPasta = () => {
@@ -44,20 +46,92 @@ export default function ProfessorDocumentos() {
     setOpenPasta(false);
   };
 
-  const onPick = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; if (!f) return;
-    const novo: Documento = {
-      id: 'd' + Date.now(), nome: f.name, url: '#',
-      pasta_id: docForm.pasta_id,
-      criado_por: currentUserId, criado_em: new Date().toISOString(),
-      acesso_alunos: docForm.todos ? 'all' : docForm.ids,
-    };
-    setDocumentos(prev => [novo, ...prev]);
-    toast.success('Documento carregado');
-    e.target.value = ''; setOpenDoc(false); setDocForm({ todos: true, ids: [] });
+    
+    toast.loading('A preparar envio...', { id: 'upload-toast' });
+    try {
+      // 1. Obter URL assinada
+      const { data: signData, error: signErr } = await supabase.functions.invoke('get-presigned-url', {
+        body: { filename: f.name, contentType: f.type },
+      });
+
+      let finalUrl = '#';
+
+      if (!signErr && signData && signData.uploadUrl && !signData.fallback) {
+        // 2. Upload direto via PUT para R2
+        toast.loading('A enviar ficheiro para o armazenamento...', { id: 'upload-toast' });
+        const uploadRes = await fetch(signData.uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': f.type },
+          body: f,
+        });
+
+        if (!uploadRes.ok) {
+          throw new Error('Falha ao carregar ficheiro para o Cloudflare R2');
+        }
+
+        finalUrl = signData.fileUrl;
+      } else {
+        console.warn('R2 não configurado ou erro no backend. Utilizando simulação local.');
+        finalUrl = URL.createObjectURL(f);
+      }
+
+      const novo: Documento = {
+        id: 'd' + Date.now(), nome: f.name, url: finalUrl,
+        pasta_id: docForm.pasta_id,
+        criado_por: currentUserId, criado_em: new Date().toISOString(),
+        acesso_alunos: docForm.todos ? 'all' : docForm.ids,
+      };
+      setDocumentos(prev => [novo, ...prev]);
+      toast.success('Documento carregado com sucesso!', { id: 'upload-toast' });
+    } catch (err: any) {
+      console.error(err);
+      toast.error('Erro ao efetuar upload: ' + err.message, { id: 'upload-toast' });
+    } finally {
+      e.target.value = '';
+      setOpenDoc(false);
+      setDocForm({ todos: true, ids: [] });
+    }
   };
 
-  const remove = (id: string) => { setDocumentos(prev => prev.filter(d => d.id !== id)); toast.success('Eliminado'); };
+  const remove = async (id: string) => {
+    const doc = documentos.find(d => d.id === id);
+    if (doc && doc.url && doc.url !== '#') {
+      try {
+        await supabase.functions.invoke('get-presigned-url', {
+          body: { action: 'delete', fileUrl: doc.url }
+        });
+      } catch (err) {
+        console.error('Erro ao eliminar ficheiro do R2:', err);
+      }
+    }
+    setDocumentos(prev => prev.filter(d => d.id !== id));
+    toast.success('Ficheiro eliminado');
+  };
+
+  const handleDownload = async (url: string, filename: string) => {
+    if (url === '#' || !url) return;
+    toast.loading('A descarregar ficheiro...', { id: 'download-toast' });
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Falha ao descarregar ficheiro do armazenamento');
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+      toast.success('Download concluído!', { id: 'download-toast' });
+    } catch (err: any) {
+      console.error(err);
+      toast.error('Erro ao efetuar download: ' + err.message, { id: 'download-toast' });
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -133,7 +207,13 @@ export default function ProfessorDocumentos() {
                 {docs.map(d => (
                   <div key={d.id} className="flex items-center gap-2 text-sm">
                     <FileText className="w-4 h-4 text-muted-foreground" />
-                    <span className="flex-1 truncate">{d.nome}</span>
+                    <span 
+                      className="flex-1 truncate cursor-pointer hover:underline text-primary font-medium"
+                      onClick={() => setPreviewDoc(d)}
+                      title="Clique para pré-visualizar"
+                    >
+                      {d.nome}
+                    </span>
                     <Button size="sm" variant="ghost" onClick={() => remove(d.id)}><Trash2 className="w-3 h-3 text-destructive" /></Button>
                   </div>
                 ))}
@@ -150,7 +230,13 @@ export default function ProfessorDocumentos() {
           {documentos.filter(d => d.criado_por === currentUserId).map(d => (
             <div key={d.id} className="p-3 flex items-center gap-2 text-sm flex-wrap">
               <FileText className="w-4 h-4 text-primary" />
-              <span className="font-medium flex-1 min-w-[180px]">{d.nome}</span>
+              <span 
+                className="font-medium flex-1 min-w-[180px] cursor-pointer hover:underline text-primary"
+                onClick={() => setPreviewDoc(d)}
+                title="Clique para pré-visualizar"
+              >
+                {d.nome}
+              </span>
               <AcessoBadge acesso={d.acesso_alunos} />
               <span className="text-xs text-muted-foreground">Criado por: {getProfile(d.criado_por)?.nome || '—'}</span>
               <Button size="sm" variant="ghost" onClick={() => remove(d.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
@@ -158,6 +244,89 @@ export default function ProfessorDocumentos() {
           ))}
         </div>
       </Card>
+
+      <Dialog open={!!previewDoc} onOpenChange={o => !o && setPreviewDoc(null)}>
+        <DialogContent className="max-w-4xl w-[90vw]">
+          <DialogHeader>
+            <DialogTitle className="truncate">{previewDoc?.nome}</DialogTitle>
+          </DialogHeader>
+          {previewDoc && (
+            <div className="mt-2">
+              {(() => {
+                  const name = previewDoc.nome.toLowerCase().trim();
+                  const ext = name.split('.').pop() || '';
+                  const isPdf = ext === 'pdf';
+                  const isText = ext === 'txt';
+                  const isVideo = ['mp4', 'webm', 'ogg', 'mov'].includes(ext);
+                  const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext);
+
+                  if (!previewDoc.url || previewDoc.url === '#') {
+                    return (
+                      <div className="text-center p-8 space-y-4 border border-dashed rounded bg-muted/10">
+                        <FileText className="w-16 h-16 text-muted-foreground mx-auto animate-pulse" />
+                        <p className="text-sm font-medium text-destructive">O ficheiro ainda não foi carregado corretamente no armazenamento.</p>
+                      </div>
+                    );
+                  }
+
+                  if (isPdf || isText) {
+                    return (
+                      <div className="text-center p-8 space-y-4 border border-dashed rounded bg-muted/10">
+                        <FileText className="w-16 h-16 text-primary mx-auto" />
+                        <div>
+                          <p className="text-sm font-medium">Documento ({ext.toUpperCase()}) pronto para visualização</p>
+                          <p className="text-xs text-muted-foreground mt-1">Para abrir e ler este documento de forma ideal, clique no botão abaixo.</p>
+                        </div>
+                        <Button asChild size="sm">
+                          <a href={previewDoc.url} target="_blank" rel="noopener noreferrer">
+                            Abrir Documento numa nova aba
+                          </a>
+                        </Button>
+                      </div>
+                    );
+                  }
+                  if (isVideo) {
+                    return (
+                      <video 
+                        src={previewDoc.url} 
+                        controls 
+                        className="w-full max-h-[65vh] rounded border bg-black" 
+                      />
+                    );
+                  }
+                  if (isImage) {
+                    return (
+                      <div className="flex justify-center p-2 bg-muted/20 border rounded">
+                        <img 
+                          src={previewDoc.url} 
+                          alt={previewDoc.nome} 
+                          className="max-w-full max-h-[65vh] object-contain rounded" 
+                        />
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="text-center p-8 space-y-4 border border-dashed rounded bg-muted/10">
+                      <FileText className="w-16 h-16 text-muted-foreground mx-auto" />
+                      <div>
+                        <p className="text-sm font-medium">Pré-visualização indisponível para este tipo de ficheiro.</p>
+                        <p className="text-xs text-muted-foreground mt-1">Pode efetuar o download para abrir no seu dispositivo.</p>
+                      </div>
+                    </div>
+                  );
+              })()}
+            </div>
+          )}
+          <DialogFooter className="flex items-center justify-between sm:justify-between gap-2 border-t pt-3">
+            <Button size="sm" variant="outline" onClick={() => setPreviewDoc(null)}>Fechar</Button>
+            {previewDoc && (
+              <Button size="sm" onClick={() => handleDownload(previewDoc.url, previewDoc.nome)}>
+                Descarregar Ficheiro
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
