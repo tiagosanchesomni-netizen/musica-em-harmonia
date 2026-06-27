@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import { formatDataHora, formatData, formatHora } from '@/lib/aulaHelpers';
 
 export default function ProfessorReposicoes() {
@@ -66,11 +67,44 @@ export default function ProfessorReposicoes() {
 
     setNotificacoes(prev => [adminNotif, ...alunoNotifs, ...prev]);
 
-    // Simulate sending email to each student
-    sel.alunos.forEach(alunoId => {
+    // Enviar emails reais via Resend/Brevo para cada aluno
+    const dataAulaAntiga = `${formatData(sel.data_hora)} às ${formatHora(sel.data_hora)}`;
+    const dataNovaAula = `${formatData(data_hora)} às ${formatHora(data_hora)}`;
+    sel.alunos.forEach(async (alunoId) => {
       const p = getProfile(alunoId);
-      if (p && p.email) {
-        toast.info(`E-mail enviado para ${p.email}: A aula de ${formatData(sel.data_hora)} às ${formatHora(sel.data_hora)} que foi cancelada foi reposta para ${formatData(data_hora)}, às ${formatHora(data_hora)}`, { duration: 8000 });
+      if (p?.email) {
+        try {
+          await supabase.functions.invoke('send-email', {
+            body: {
+              to: p.email,
+              subject: `✅ Aula reposta — ${dataNovaAula}`,
+              html: `
+                <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; background: #f9fafb; padding: 32px; border-radius: 12px;">
+                  <div style="text-align: center; margin-bottom: 24px;">
+                    <h1 style="color: #1e1b4b; font-size: 22px; margin: 0;">🎵 Escola de Música GRT</h1>
+                    <p style="color: #6b7280; margin: 8px 0 0;">Confirmação de Reposição</p>
+                  </div>
+                  <div style="background: white; border-radius: 8px; padding: 24px; border: 1px solid #e5e7eb;">
+                    <div style="background: #ecfdf5; border-left: 4px solid #10b981; padding: 12px 16px; border-radius: 4px; margin-bottom: 16px;">
+                      <p style="color: #047857; font-weight: bold; margin: 0;">✅ Aula de Reposição Agendada</p>
+                    </div>
+                    <p style="color: #374151; margin: 0 0 8px;">Olá <strong>${p.nome}</strong>,</p>
+                    <p style="color: #374151; margin: 0 0 16px;">
+                      A sua aula de <strong>${dataAulaAntiga}</strong> que tinha sido cancelada foi reposta e agendada para:
+                    </p>
+                    <p style="color: #1e1b4b; font-size: 16px; font-weight: bold; margin: 0 0 16px; text-align: center; background: #f3f4f6; padding: 12px; border-radius: 6px;">
+                      📅 ${dataNovaAula}
+                    </p>
+                    <p style="color: #6b7280; font-size: 13px; margin: 0;">Esperamos por si!</p>
+                  </div>
+                  <p style="color: #9ca3af; font-size: 12px; text-align: center; margin-top: 24px;">Escola de Música GRT — Sistema de Gestão</p>
+                </div>
+              `,
+            },
+          });
+        } catch {
+          console.warn(`Falha ao enviar email para ${p.email}`);
+        }
       }
     });
 
