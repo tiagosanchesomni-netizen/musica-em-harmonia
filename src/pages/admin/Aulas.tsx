@@ -10,7 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Pencil, CalendarDays } from 'lucide-react';
+import { Plus, Pencil, CalendarDays, Filter, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { estadoConfig, formatDataHora, formatData, formatHora } from '@/lib/aulaHelpers';
@@ -21,6 +21,7 @@ export default function AdminAulas() {
   const alunos = profiles.filter(p => p.role === 'aluno');
 
   const [open, setOpen] = useState(false);
+  const [filtroTempo, setFiltroTempo] = useState<string>('todas');
   const [editing, setEditing] = useState<Aula | null>(null);
   const [form, setForm] = useState<{
     sala_id: string; data: string; hora: string; duracao: number;
@@ -245,7 +246,42 @@ export default function AdminAulas() {
     setOpen(true);
   };
 
+  const handleDelete = (id: string) => {
+    if (confirm('Tem a certeza que deseja eliminar permanentemente esta aula? Esta ação não pode ser desfeita.')) {
+      setAulas(prev => prev.filter(a => a.id !== id));
+      toast.success('Aula eliminada com sucesso');
+    }
+  };
+
+  const filterAulasByTime = (aulasList: Aula[]) => {
+    if (filtroTempo === 'todas') return aulasList;
+    
+    const agora = new Date();
+    agora.setHours(0, 0, 0, 0);
+    
+    return aulasList.filter(a => {
+      const dataAula = new Date(a.data_hora);
+      const diffTime = dataAula.getTime() - agora.getTime();
+      const diffDays = diffTime / (1000 * 60 * 60 * 24);
+      
+      if (filtroTempo === 'semana') {
+        return diffDays >= 0 && diffDays <= 7;
+      }
+      if (filtroTempo === 'duas_semanas') {
+        return diffDays >= 0 && diffDays <= 14;
+      }
+      if (filtroTempo === 'mes') {
+        return diffDays >= 0 && diffDays <= 30;
+      }
+      if (filtroTempo === 'ano') {
+        return diffDays >= 0 && diffDays <= 365;
+      }
+      return true;
+    });
+  };
+
   const sorted = [...aulas].sort((a, b) => new Date(a.data_hora).getTime() - new Date(b.data_hora).getTime());
+  const filtered = filterAulasByTime(sorted);
 
   return (
     <div className="space-y-6">
@@ -254,7 +290,24 @@ export default function AdminAulas() {
           <h1 className="text-2xl font-bold">Aulas</h1>
           <p className="text-sm text-muted-foreground">Vista global de todas as aulas da escola.</p>
         </div>
-        <Button onClick={openCreate}><Plus className="w-4 h-4 mr-2" />Nova Aula</Button>
+        <div className="flex items-center gap-2">
+          <Select value={filtroTempo} onValueChange={setFiltroTempo}>
+            <SelectTrigger className="w-[180px]">
+              <span className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-muted-foreground" />
+                <SelectValue placeholder="Filtrar por tempo" />
+              </span>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todas">Todas as aulas</SelectItem>
+              <SelectItem value="semana">Esta semana</SelectItem>
+              <SelectItem value="duas_semanas">Duas semanas</SelectItem>
+              <SelectItem value="mes">Este mês</SelectItem>
+              <SelectItem value="ano">Este ano</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button onClick={openCreate}><Plus className="w-4 h-4 mr-2" />Nova Aula</Button>
+        </div>
       </div>
 
       <Card>
@@ -270,7 +323,7 @@ export default function AdminAulas() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sorted.map(a => {
+            {filtered.map(a => {
               const cfg = estadoConfig[a.estado];
               return (
                 <TableRow key={a.id}>
@@ -296,8 +349,9 @@ export default function AdminAulas() {
                     {a.tipo === 'reposicao' && <Badge variant="outline" className="ml-1">Reposição</Badge>}
                     {a.grupo_id && <Badge variant="outline" className="ml-1 bg-primary/10 text-primary border-primary/20">Semanal</Badge>}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right space-x-1">
                     <Button size="sm" variant="ghost" onClick={() => startEdit(a)}><Pencil className="w-4 h-4" /></Button>
+                    <Button size="sm" variant="ghost" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => handleDelete(a.id)}><Trash2 className="w-4 h-4" /></Button>
                   </TableCell>
                 </TableRow>
               );
