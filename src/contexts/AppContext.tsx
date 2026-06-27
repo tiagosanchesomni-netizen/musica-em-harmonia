@@ -129,6 +129,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
+    if (currentUserId && profiles.length > 0) {
+      const updatedUser = profiles.find(p => p.id === currentUserId);
+      if (updatedUser) {
+        setCurrentUser(updatedUser);
+      }
+    }
+  }, [profiles, currentUserId]);
+
+  useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         loadAllData(session.user).finally(() => setLoading(false));
