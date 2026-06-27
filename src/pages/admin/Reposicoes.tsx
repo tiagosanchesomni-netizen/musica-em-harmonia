@@ -15,7 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatDataHora, formatData, formatHora } from '@/lib/aulaHelpers';
 
 export default function AdminReposicoes() {
-  const { aulas, setAulas, salas, getSala, getProfile, setNotificacoes } = useApp();
+  const { aulas, setAulas, salas, getSala, getProfile, setNotificacoes, profiles } = useApp();
   const pendentes = aulas.filter(a => a.estado === 'pendente_reposicao');
   const repostas = aulas.filter(a => a.tipo === 'reposicao');
 

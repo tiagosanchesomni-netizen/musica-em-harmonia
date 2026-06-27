@@ -14,7 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatDataHora, formatData, formatHora } from '@/lib/aulaHelpers';
 
 export default function ProfessorReposicoes() {
-  const { aulas, setAulas, currentUserId, getSala, salas, setNotificacoes, getProfile } = useApp();
+  const { aulas, setAulas, currentUserId, getSala, salas, setNotificacoes, getProfile, profiles } = useApp();
   const pendentes = aulas.filter(a => a.estado === 'pendente_reposicao' && a.professores.includes(currentUserId));
 
   const [sel, setSel] = useState<Aula | null>(null);

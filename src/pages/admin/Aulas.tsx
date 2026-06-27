@@ -97,6 +97,7 @@ export default function AdminAulas() {
       }));
       toast.success('Aula atualizada');
     } else {
+      let criadas: Aula[] = [];
       if (form.semanal) {
         const grupoId = 'g-' + Date.now();
         const novasAulas: Aula[] = [];
@@ -119,6 +120,7 @@ export default function AdminAulas() {
         }
         
         setAulas(prev => [...prev, ...novasAulas]);
+        criadas = novasAulas;
         toast.success('Série de 4 aulas semanais criada com sucesso');
       } else {
         const nova: Aula = {
@@ -132,8 +134,114 @@ export default function AdminAulas() {
           alunos: form.alunos,
         };
         setAulas(prev => [...prev, nova]);
+        criadas = [nova];
         toast.success('Aula criada');
       }
+
+      // Enviar notificações e e-mails para alunos e admins
+      const novasNotifs: any[] = [];
+      criadas.forEach(aula => {
+        const profNames = aula.professores.map(pId => getProfile(pId)?.nome || '').join(', ');
+        const dataAula = `${formatData(aula.data_hora)} às ${formatHora(aula.data_hora)}`;
+
+        // 1. Notificação para Admin
+        const adminNotif = {
+          id: 'n-adm-new-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+          mensagem: `Nova aula agendada para ${dataAula} (Prof. ${profNames})`,
+          lida: false,
+          tipo: 'reposicao_marcada' as const,
+          criado_em: new Date().toISOString(),
+          destinatario_role: 'admin' as const,
+        };
+        novasNotifs.push(adminNotif);
+
+        // 2. Notificações para Alunos
+        aula.alunos.forEach((alunoId, idx) => {
+          const alunoNotif = {
+            id: `n-al-new-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
+            mensagem: `Nova aula agendada para ${dataAula} com o(a) Prof. ${profNames}.`,
+            lida: false,
+            tipo: 'reposicao_marcada' as const,
+            criado_em: new Date().toISOString(),
+            destinatario_role: 'aluno' as const,
+            aluno_id: alunoId,
+          };
+          novasNotifs.push(alunoNotif);
+        });
+
+        // 3. Enviar Emails
+        // Cópia para todos os Admins
+        const adminEmails = profiles.filter(pr => pr.role === 'admin' && pr.email).map(pr => pr.email);
+        adminEmails.forEach(async (adminEmail) => {
+          try {
+            await supabase.functions.invoke('send-email', {
+              body: {
+                to: adminEmail,
+                subject: `📅 [ADMIN] Nova aula agendada — ${dataAula}`,
+                html: `
+                  <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; background: #f9fafb; padding: 32px; border-radius: 12px;">
+                    <div style="text-align: center; margin-bottom: 24px;">
+                      <h1 style="color: #1e1b4b; font-size: 22px; margin: 0;">🎵 Escola de Música GRT</h1>
+                      <p style="color: #6b7280; margin: 8px 0 0;">Cópia de Agendamento de Aula</p>
+                    </div>
+                    <div style="background: white; border-radius: 8px; padding: 24px; border: 1px solid #e5e7eb;">
+                      <p style="color: #4f46e5; font-weight: bold; margin: 0 0 12px;">📅 Nova Aula Agendada</p>
+                      <p style="color: #374151; margin: 0 0 8px;">Uma nova aula foi agendada no sistema:</p>
+                      <ul style="color: #374151; margin: 0 0 16px; padding-left: 20px;">
+                        <li><strong>Data/Hora:</strong> ${dataAula}</li>
+                        <li><strong>Professor(a):</strong> ${profNames}</li>
+                        <li><strong>Alunos:</strong> ${aula.alunos.map(aId => getProfile(aId)?.nome).join(', ')}</li>
+                        <li><strong>Sala:</strong> ${getSala(aula.sala_id)?.nome || '—'}</li>
+                      </ul>
+                    </div>
+                    <p style="color: #9ca3af; font-size: 12px; text-align: center; margin-top: 24px;">Escola de Música GRT — Sistema de Gestão</p>
+                  </div>
+                `,
+              },
+            });
+          } catch (err) {
+            console.error('Erro ao enviar cópia de agendamento para admin:', err);
+          }
+        });
+
+        // Email para cada Aluno
+        aula.alunos.forEach(async (alunoId) => {
+          const p = getProfile(alunoId);
+          if (p?.email) {
+            try {
+              await supabase.functions.invoke('send-email', {
+                body: {
+                  to: p.email,
+                  subject: `📅 Nova aula agendada — ${dataAula}`,
+                  html: `
+                    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; background: #f9fafb; padding: 32px; border-radius: 12px;">
+                      <div style="text-align: center; margin-bottom: 24px;">
+                        <h1 style="color: #1e1b4b; font-size: 22px; margin: 0;">🎵 Escola de Música GRT</h1>
+                        <p style="color: #6b7280; margin: 8px 0 0;">Notificação de Agendamento</p>
+                      </div>
+                      <div style="background: white; border-radius: 8px; padding: 24px; border: 1px solid #e5e7eb;">
+                        <div style="background: #e0e7ff; border-left: 4px solid #4f46e5; padding: 12px 16px; border-radius: 4px; margin-bottom: 16px;">
+                          <p style="color: #4f46e5; font-weight: bold; margin: 0;">📅 Nova Aula Agendada</p>
+                        </div>
+                        <p style="color: #374151; margin: 0 0 8px;">Olá <strong>${p.nome}</strong>,</p>
+                        <p style="color: #374151; margin: 0 0 16px;">
+                          Foi agendada uma nova aula para si no dia <strong>${dataAula}</strong> com o(a) Prof. <strong>${profNames}</strong> na <strong>${getSala(aula.sala_id)?.nome || 'Sala'}</strong>.
+                        </p>
+                        <p style="color: #6b7280; font-size: 13px; margin: 0;">Por favor, compareça no horário agendado.</p>
+                      </div>
+                      <p style="color: #9ca3af; font-size: 12px; text-align: center; margin-top: 24px;">Escola de Música GRT — Sistema de Gestão</p>
+                    </div>
+                  `,
+                },
+              });
+            } catch (err) {
+              console.error('Erro ao enviar email de agendamento para aluno:', err);
+            }
+          }
+        });
+      });
+
+      setNotificacoes(prev => [...novasNotifs, ...prev]);
     }
     setOpen(false);
   };
