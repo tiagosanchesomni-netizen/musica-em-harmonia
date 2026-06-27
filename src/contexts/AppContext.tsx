@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   Role, Profile, Sala, Aula, Assiduidade, Pasta, Documento, Notificacao
 } from '@/data/mockData';
+import { toast } from 'sonner';
 
 interface AppContextType {
   currentRole: Role;
@@ -136,6 +137,45 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     }
   }, [profiles, currentUserId]);
+
+  useEffect(() => {
+    const REFRESH_TIMEOUT = 2 * 60 * 1000; // 2 minutos
+    const LOGOUT_TIMEOUT = 10 * 60 * 1000; // 10 minutos
+
+    let refreshTimer: number;
+    let logoutTimer: number;
+
+    const resetTimers = () => {
+      window.clearTimeout(refreshTimer);
+      window.clearTimeout(logoutTimer);
+
+      refreshTimer = window.setTimeout(() => {
+        window.location.reload();
+      }, REFRESH_TIMEOUT);
+
+      if (currentUserId) {
+        logoutTimer = window.setTimeout(() => {
+          logout();
+          toast.warning('Sessão encerrada por inatividade.');
+        }, LOGOUT_TIMEOUT);
+      }
+    };
+
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+    events.forEach(event => {
+      window.addEventListener(event, resetTimers);
+    });
+
+    resetTimers();
+
+    return () => {
+      window.clearTimeout(refreshTimer);
+      window.clearTimeout(logoutTimer);
+      events.forEach(event => {
+        window.removeEventListener(event, resetTimers);
+      });
+    };
+  }, [currentUserId]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
