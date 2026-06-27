@@ -85,11 +85,23 @@ export default function Utilizadores() {
     toast.info(`Chave provisória de ${p.nome}: ${key} (Copiada)`);
   };
 
-  const remove = (id: string) => {
+  const remove = async (id: string) => {
     const target = profiles.find(p => p.id === id);
     if (target?.role === 'admin') return toast.error('Não é possível eliminar um administrador');
-    setProfiles(prev => prev.filter(p => p.id !== id));
-    toast.success('Utilizador eliminado');
+    
+    try {
+      const { error } = await supabase
+        .from('app_profiles')
+        .delete()
+        .eq('id', id);
+        
+      if (error) throw error;
+
+      setProfiles(prev => prev.filter(p => p.id !== id));
+      toast.success('Utilizador eliminado. Lembre-se de também remover o email em "Authentication > Users" no painel do Supabase se precisar de o reutilizar.');
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao eliminar utilizador');
+    }
   };
 
   const roleLabel: Record<Role, string> = { admin: 'Admin', professor: 'Professor', aluno: 'Aluno' };
