@@ -154,8 +154,8 @@ export default function ProfessorAulas() {
         }
       });
 
-      if (diffDays > 5) {
-        toast.success('Aula criada com sucesso. Aparecerá quando faltarem 5 dias.');
+      if (diffDays > 7) {
+        toast.success('Aula criada com sucesso. Aparecerá quando faltarem 7 dias.');
       } else {
         toast.success('Aula criada');
       }
@@ -373,7 +373,7 @@ export default function ProfessorAulas() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Aulas</h1>
-          <p className="text-sm text-muted-foreground">Aulas dos próximos 5 dias e dos últimos 2 dias.</p>
+          <p className="text-sm text-muted-foreground">Aulas dos próximos 7 dias e dos últimos 7 dias.</p>
         </div>
         <Button onClick={openCreateDialog}><Plus className="w-4 h-4 mr-2" />Nova Aula</Button>
       </div>

@@ -12,7 +12,7 @@ export default function AlunoAulas() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">As minhas Aulas</h1>
-        <p className="text-sm text-muted-foreground">Aulas previstas para as próximas 2 semanas.</p>
+        <p className="text-sm text-muted-foreground">Aulas previstas para os próximos 7 dias.</p>
       </div>
 
       {lista.length === 0 && (

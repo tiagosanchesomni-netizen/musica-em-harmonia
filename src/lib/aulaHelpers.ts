@@ -28,24 +28,24 @@ export function diasEntre(iso: string): number {
   return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-// Professor: aulas dos últimos 2 dias até próximos 5 dias
+// Professor: aulas dos últimos 7 dias até próximos 7 dias
 export function filtroProfessor(aulas: Aula[], professorId: string): Aula[] {
   return aulas
     .filter(a => a.professores.includes(professorId))
     .filter(a => {
       const d = diasEntre(a.data_hora);
-      return d >= -2 && d <= 5;
+      return d >= -7 && d <= 7;
     })
     .sort((a, b) => new Date(a.data_hora).getTime() - new Date(b.data_hora).getTime());
 }
 
-// Aluno: próximas 2 semanas (a partir de hoje)
+// Aluno: próximos 7 dias (a partir de hoje)
 export function filtroAluno(aulas: Aula[], alunoId: string): Aula[] {
   return aulas
     .filter(a => a.alunos.includes(alunoId))
     .filter(a => {
       const d = diasEntre(a.data_hora);
-      return d >= 0 && d <= 14;
+      return d >= 0 && d <= 7;
     })
     .sort((a, b) => new Date(a.data_hora).getTime() - new Date(b.data_hora).getTime());
 }
