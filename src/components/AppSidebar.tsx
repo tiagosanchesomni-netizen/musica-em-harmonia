@@ -31,6 +31,7 @@ const itemsByRole: Record<Role, NavItem[]> = {
     { title: 'Utilizadores', url: '/admin/utilizadores', icon: Users },
     { title: 'Salas', url: '/admin/salas', icon: DoorOpen },
     { title: 'Aulas', url: '/admin/aulas', icon: CalendarDays },
+    { title: 'Sumários', url: '/admin/sumarios', icon: FileText },
     { title: 'Reposições', url: '/admin/reposicoes', icon: RotateCcw },
     { title: 'Documentos', url: '/admin/documentos', icon: FileText },
     { title: 'Estatísticas', url: '/admin/estatisticas', icon: BarChart3 },
@@ -38,6 +39,7 @@ const itemsByRole: Record<Role, NavItem[]> = {
   ],
   professor: [
     { title: 'Aulas', url: '/professor/aulas', icon: BookOpen },
+    { title: 'Sumários', url: '/professor/sumarios', icon: FileText },
     { title: 'Reposições', url: '/professor/reposicoes', icon: RotateCcw },
     { title: 'Documentos', url: '/professor/documentos', icon: FolderOpen },
     { title: 'Estatísticas', url: '/professor/estatisticas', icon: BarChart3 },

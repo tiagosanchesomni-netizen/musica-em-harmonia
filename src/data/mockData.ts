@@ -38,6 +38,7 @@ export interface Aula {
   data_original?: string;
   presencas_finalizadas?: boolean;
   grupo_id?: string; // identificador da série semanal
+  sumario?: string;
 }
 
 export interface Assiduidade {

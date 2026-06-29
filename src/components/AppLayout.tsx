@@ -46,7 +46,7 @@ export function AppLayout() {
               <Badge variant="secondary" className="capitalize">{roleLabels[currentRole]}</Badge>
             </div>
           </header>
-          <main className="flex-1 overflow-auto p-6 bg-background">
+          <main className="flex-1 overflow-auto p-4 md:p-6 bg-background">
             <Outlet />
           </main>
         </div>

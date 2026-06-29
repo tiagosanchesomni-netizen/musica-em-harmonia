@@ -57,7 +57,11 @@ export default function AlunoNotificacoes() {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <Badge variant="outline">
-                  {n.tipo === 'cancelamento' ? 'Cancelamento' : 'Reposição Marcada'}
+                  {n.tipo === 'cancelamento'
+                    ? 'Cancelamento'
+                    : n.mensagem.toLowerCase().includes('reposi')
+                    ? 'Reposição Marcada'
+                    : 'Nova Aula'}
                 </Badge>
                 {!n.lida && <Badge className="bg-primary text-primary-foreground">Nova</Badge>}
               </div>

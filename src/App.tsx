@@ -12,6 +12,7 @@ import AdminAulas from "@/pages/admin/Aulas";
 import AdminReposicoes from "@/pages/admin/Reposicoes";
 import AdminDocumentos from "@/pages/admin/Documentos";
 import AdminNotificacoes from "@/pages/admin/Notificacoes";
+import Sumarios from "@/pages/Sumarios";
 
 import ProfessorAulas from "@/pages/professor/Aulas";
 import ProfessorReposicoes from "@/pages/professor/Reposicoes";
@@ -44,12 +45,14 @@ const App = () => (
               <Route path="/admin/utilizadores" element={<AdminUtilizadores />} />
               <Route path="/admin/salas" element={<AdminSalas />} />
               <Route path="/admin/aulas" element={<AdminAulas />} />
+              <Route path="/admin/sumarios" element={<Sumarios />} />
               <Route path="/admin/reposicoes" element={<AdminReposicoes />} />
               <Route path="/admin/documentos" element={<AdminDocumentos />} />
               <Route path="/admin/notificacoes" element={<AdminNotificacoes />} />
               <Route path="/admin/estatisticas" element={<Estatisticas />} />
 
               <Route path="/professor/aulas" element={<ProfessorAulas />} />
+              <Route path="/professor/sumarios" element={<Sumarios />} />
               <Route path="/professor/reposicoes" element={<ProfessorReposicoes />} />
               <Route path="/professor/documentos" element={<ProfessorDocumentos />} />
               <Route path="/professor/estatisticas" element={<Estatisticas />} />

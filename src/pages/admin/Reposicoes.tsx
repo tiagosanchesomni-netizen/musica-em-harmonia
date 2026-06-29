@@ -153,7 +153,7 @@ export default function AdminReposicoes() {
         <p className="text-sm text-muted-foreground">Aulas canceladas a aguardar nova marcação e histórico das já repostas.</p>
       </div>
 
-      <Card>
+      <Card className="overflow-x-auto">
         <div className="px-4 py-3 border-b font-semibold flex items-center gap-2">
           <Badge className="bg-status-absent text-status-absent-foreground">Por repor</Badge>
           <span>{pendentes.length} aulas</span>
@@ -179,7 +179,7 @@ export default function AdminReposicoes() {
         </Table>
       </Card>
 
-      <Card>
+      <Card className="overflow-x-auto">
         <div className="px-4 py-3 border-b font-semibold flex items-center gap-2">
           <Badge className="bg-status-scheduled text-status-scheduled-foreground">Reposições marcadas</Badge>
           <span>{repostas.length} aulas</span>

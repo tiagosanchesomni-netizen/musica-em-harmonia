@@ -10,10 +10,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Pencil, CalendarDays, Filter, Trash2, Eye, Upload, FileText, FolderPlus, Check, X } from 'lucide-react';
+import { Plus, Pencil, CalendarDays, Filter, Trash2, Eye, Upload, FileText, FolderPlus, Check, X, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { estadoConfig, formatDataHora, formatData, formatHora } from '@/lib/aulaHelpers';
+import { estadoConfig, formatDataHora, formatData, formatHora, diasEntre } from '@/lib/aulaHelpers';
 
 export default function AdminAulas() {
   const { 
@@ -26,6 +26,12 @@ export default function AdminAulas() {
   const [editing, setEditing] = useState<Aula | null>(null);
   
   const [selectedClasswork, setSelectedClasswork] = useState<Aula | null>(null);
+  const [sumarioText, setSumarioText] = useState('');
+
+  const handleSelectClasswork = (aula: Aula | null) => {
+    setSelectedClasswork(aula);
+    setSumarioText(aula?.sumario || '');
+  };
   const [previewDoc, setPreviewDoc] = useState<any | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [selectedFolderId, setSelectedFolderId] = useState<string>('none');
@@ -442,7 +448,7 @@ export default function AdminAulas() {
   const finalizarClasswork = () => {
     if (!selectedClasswork) return;
     setAulas(prev => {
-      const updated = prev.map(a => a.id === selectedClasswork.id ? { ...a, estado: 'realizada', presencas_finalizadas: true } : a);
+      const updated = prev.map(a => a.id === selectedClasswork.id ? { ...a, estado: 'realizada', presencas_finalizadas: true, sumario: sumarioText.trim() } : a);
       
       if (selectedClasswork.grupo_id) {
         const grupoAulas = updated.filter(a => a.grupo_id === selectedClasswork.grupo_id);
@@ -681,14 +687,14 @@ export default function AdminAulas() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold">Aulas</h1>
           <p className="text-sm text-muted-foreground">Vista global de todas as aulas da escola.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           <Select value={filtroTempo} onValueChange={setFiltroTempo}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full sm:w-[180px]">
               <span className="flex items-center gap-2">
                 <Filter className="w-4 h-4 text-muted-foreground" />
                 <SelectValue placeholder="Filtrar por tempo" />
@@ -702,63 +708,65 @@ export default function AdminAulas() {
               <SelectItem value="ano">Este ano</SelectItem>
             </SelectContent>
           </Select>
-          <Button onClick={openCreate}><Plus className="w-4 h-4 mr-2" />Nova Aula</Button>
+          <Button onClick={openCreate} className="w-full sm:w-auto"><Plus className="w-4 h-4 mr-2" />Nova Aula</Button>
         </div>
       </div>
 
-      <Card>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Data / Hora</TableHead>
-              <TableHead>Sala</TableHead>
-              <TableHead>Professores</TableHead>
-              <TableHead>Alunos</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead className="text-right">Ações</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.map(a => {
-              const cfg = estadoConfig[a.estado];
-              return (
-                <TableRow key={a.id}>
-                  <TableCell className="cursor-pointer" onClick={() => { setSelectedClasswork(a); setSelectedFolderId('none'); }}>
-                    <div className="font-semibold hover:underline text-primary">{a.nome || 'Aula'}</div>
-                    <div className="text-[10px] text-muted-foreground">{formatDataHora(a.data_hora)}</div>
-                  </TableCell>
-                  <TableCell>{getSala(a.sala_id)?.nome || '—'}</TableCell>
-                  <TableCell className="text-xs">{a.professores.map(p => getProfile(p)?.nome).join(', ')}</TableCell>
-                  <TableCell className="text-xs">
-                    <div className="space-y-1">
-                      {a.alunos.map(aId => {
-                        const al = getProfile(aId);
-                        const ass = assiduidades.find(x => x.aula_id === a.id && x.aluno_id === aId);
-                        return (
-                          <div key={aId} className="flex items-center gap-2">
-                            <Checkbox checked={!!ass?.presente} onCheckedChange={() => togglePresenca(a.id, aId)} />
-                            <span>{al?.nome}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </TableCell>
-                  <TableCell>
+      {filtered.length === 0 && (
+        <Card className="p-8 text-center text-muted-foreground">Não há aulas neste intervalo.</Card>
+      )}
+
+      <div className="grid gap-3">
+        {filtered.map(a => {
+          const cfg = estadoConfig[a.estado];
+          const dias = diasEntre(a.data_hora);
+          const isRepo = a.tipo === 'reposicao';
+          const profNames = a.professores.map(p => getProfile(p)?.nome).filter(Boolean).join(', ');
+          const aluNames = a.alunos.map(p => getProfile(p)?.nome).filter(Boolean).join(', ');
+
+          return (
+            <Card key={a.id}
+              onClick={() => { handleSelectClasswork(a); setSelectedFolderId('none'); }}
+              className={`p-4 cursor-pointer hover:shadow-md transition ${isRepo ? 'border-l-4 border-l-primary bg-primary/5' : ''}`}>
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                <div className="flex-1 space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {a.nome && <span className="font-bold text-primary">{a.nome}</span>}
+                    <CalendarDays className="w-4 h-4 text-muted-foreground" />
+                    <span className="font-semibold">{formatDataHora(a.data_hora)}</span>
                     <Badge className={cfg.className}>{cfg.label}</Badge>
-                    {a.tipo === 'reposicao' && <Badge variant="outline" className="ml-1">Reposição</Badge>}
-                    {a.grupo_id && <Badge variant="outline" className="ml-1 bg-primary/10 text-primary border-primary/20">Semanal</Badge>}
-                  </TableCell>
-                  <TableCell className="text-right space-x-1">
-                    <Button size="sm" variant="ghost" onClick={() => { setSelectedClasswork(a); setSelectedFolderId('none'); }} title="Lançar/Visualizar Detalhes"><Eye className="w-4 h-4" /></Button>
-                    <Button size="sm" variant="ghost" onClick={() => startEdit(a)}><Pencil className="w-4 h-4" /></Button>
-                    <Button size="sm" variant="ghost" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => handleDelete(a.id)}><Trash2 className="w-4 h-4" /></Button>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </Card>
+                    {isRepo && <Badge className="bg-primary text-primary-foreground">Aula de Reposição</Badge>}
+                    {a.grupo_id && <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20">Semanal</Badge>}
+                    {dias === 0 && <Badge variant="outline"><Clock className="w-3 h-3 mr-1" />Hoje</Badge>}
+                  </div>
+                  
+                  <div className="text-sm text-muted-foreground space-y-1">
+                    <p>
+                      <strong>Sala:</strong> {getSala(a.sala_id)?.nome || '—'} • <strong>Duração:</strong> {a.duracao} min
+                    </p>
+                    <p className="text-xs">
+                      <strong>Professores:</strong> {profNames || 'Nenhum'}
+                    </p>
+                    <p className="text-xs">
+                      <strong>Alunos:</strong> {aluNames || 'Nenhum'}
+                    </p>
+                  </div>
+                  
+                  {isRepo && a.data_original && (
+                    <p className="text-xs text-muted-foreground mt-1">Reposição da aula de {formatDataHora(a.data_original)}</p>
+                  )}
+                </div>
+                
+                <div className="flex items-center gap-1 shrink-0 self-end sm:self-start" onClick={e => e.stopPropagation()}>
+                  <Button size="sm" variant="ghost" onClick={() => { handleSelectClasswork(a); setSelectedFolderId('none'); }} title="Lançar/Visualizar Detalhes"><Eye className="w-4 h-4" /></Button>
+                  <Button size="sm" variant="ghost" onClick={() => startEdit(a)} title="Editar Aula"><Pencil className="w-4 h-4" /></Button>
+                  <Button size="sm" variant="ghost" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => handleDelete(a.id)} title="Eliminar Aula"><Trash2 className="w-4 h-4" /></Button>
+                </div>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-2xl">
@@ -838,7 +846,7 @@ export default function AdminAulas() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!selectedClasswork} onOpenChange={o => { if (!o) { setSelectedClasswork(null); setPreviewDoc(null); } }}>
+      <Dialog open={!!selectedClasswork} onOpenChange={o => { if (!o) { handleSelectClasswork(null); setPreviewDoc(null); } }}>
         <DialogContent className={previewDoc ? "max-w-4xl w-[90vw]" : "max-w-lg"}>
           <DialogHeader>
             <DialogTitle>
@@ -846,7 +854,8 @@ export default function AdminAulas() {
             </DialogTitle>
           </DialogHeader>
 
-          {previewDoc ? (
+          <div className="max-h-[75vh] overflow-y-auto pr-1">
+            {previewDoc ? (
             <div className="space-y-4">
               <div className="mt-2">
                 {(() => {
@@ -1023,6 +1032,18 @@ export default function AdminAulas() {
                     <input ref={inputRef} type="file" hidden onChange={uploadClasswork} />
                   </div>
                 </div>
+
+                <div className="space-y-1 mt-2">
+                  <Label htmlFor="sumario-textarea" className="text-xs font-semibold text-muted-foreground">Sumário da Aula</Label>
+                  <textarea
+                    id="sumario-textarea"
+                    className="w-full min-h-[80px] p-2 text-sm border rounded bg-background"
+                    placeholder="Escreva o sumário da aula aqui..."
+                    value={sumarioText}
+                    onChange={e => setSumarioText(e.target.value)}
+                  />
+                </div>
+
                 <DialogFooter className="gap-2 pt-2 border-t mt-2">
                   <Button variant="destructive" onClick={cancelarClasswork}><X className="w-4 h-4 mr-2" />Cancelar Aula</Button>
                   <Button onClick={finalizarClasswork}><Check className="w-4 h-4 mr-2" />Guardar e Finalizar</Button>
@@ -1030,6 +1051,7 @@ export default function AdminAulas() {
               </div>
             )
           )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

@@ -54,7 +54,15 @@ export default function AdminNotificacoes() {
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2">
-                <Badge variant="outline">{n.tipo === 'cancelamento' ? 'Cancelamento' : n.tipo === 'atraso_presenca' ? 'Presenças em atraso' : 'Reposição'}</Badge>
+                <Badge variant="outline">
+                  {n.tipo === 'cancelamento'
+                    ? 'Cancelamento'
+                    : n.tipo === 'atraso_presenca'
+                    ? 'Presenças em atraso'
+                    : n.mensagem.toLowerCase().includes('reposi')
+                    ? 'Reposição'
+                    : 'Nova Aula'}
+                </Badge>
                 {!n.lida && <Badge className="bg-primary text-primary-foreground">Nova</Badge>}
               </div>
               <p className="mt-1 text-sm">{n.mensagem}</p>

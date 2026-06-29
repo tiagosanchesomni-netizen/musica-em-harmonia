@@ -23,6 +23,12 @@ export default function ProfessorAulas() {
   
   const lista = filtroProfessor(aulas, currentUserId);
   const [selected, setSelected] = useState<Aula | null>(null);
+  const [sumarioText, setSumarioText] = useState('');
+
+  const handleSelect = (aula: Aula | null) => {
+    setSelected(aula);
+    setSumarioText(aula?.sumario || '');
+  };
   const [previewDoc, setPreviewDoc] = useState<any | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -198,7 +204,7 @@ export default function ProfessorAulas() {
   const finalizar = () => {
     if (!selected) return;
     setAulas(prev => {
-      const updated = prev.map(a => a.id === selected.id ? { ...a, estado: 'realizada', presencas_finalizadas: true } : a);
+      const updated = prev.map(a => a.id === selected.id ? { ...a, estado: 'realizada', presencas_finalizadas: true, sumario: sumarioText.trim() } : a);
       
       // Se a aula finalizada for semanal, cria mais uma aula para a semana seguinte
       if (selected.grupo_id) {
@@ -389,7 +395,7 @@ export default function ProfessorAulas() {
           const isRepo = a.tipo === 'reposicao';
           return (
             <Card key={a.id}
-              onClick={() => { setSelected(a); setSelectedFolderId('none'); }}
+              onClick={() => { handleSelect(a); setSelectedFolderId('none'); }}
               className={`p-4 cursor-pointer hover:shadow-md transition ${isRepo ? 'border-l-4 border-l-primary bg-primary/5' : ''}`}>
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
@@ -414,7 +420,7 @@ export default function ProfessorAulas() {
         })}
       </div>
 
-      <Dialog open={!!selected} onOpenChange={o => { if (!o) { setSelected(null); setPreviewDoc(null); } }}>
+      <Dialog open={!!selected} onOpenChange={o => { if (!o) { handleSelect(null); setPreviewDoc(null); } }}>
         <DialogContent className={previewDoc ? "max-w-4xl w-[90vw]" : "max-w-lg"}>
           <DialogHeader>
             <DialogTitle>
@@ -422,7 +428,8 @@ export default function ProfessorAulas() {
             </DialogTitle>
           </DialogHeader>
 
-          {previewDoc ? (
+          <div className="max-h-[75vh] overflow-y-auto pr-1">
+            {previewDoc ? (
             <div className="space-y-4">
               <div className="mt-2">
                 {(() => {
@@ -599,6 +606,18 @@ export default function ProfessorAulas() {
                     <input ref={inputRef} type="file" hidden onChange={upload} />
                   </div>
                 </div>
+
+                <div className="space-y-1 mt-2">
+                  <Label htmlFor="sumario-textarea" className="text-xs font-semibold text-muted-foreground">Sumário da Aula</Label>
+                  <textarea
+                    id="sumario-textarea"
+                    className="w-full min-h-[80px] p-2 text-sm border rounded bg-background"
+                    placeholder="Escreva o sumário da aula aqui..."
+                    value={sumarioText}
+                    onChange={e => setSumarioText(e.target.value)}
+                  />
+                </div>
+
                 <DialogFooter className="gap-2 pt-2 border-t mt-2">
                   <Button variant="destructive" onClick={cancelar}><X className="w-4 h-4 mr-2" />Cancelar Aula</Button>
                   <Button onClick={finalizar}><Check className="w-4 h-4 mr-2" />Guardar e Finalizar</Button>
@@ -606,6 +625,7 @@ export default function ProfessorAulas() {
               </div>
             )
           )}
+          </div>
         </DialogContent>
       </Dialog>
 
